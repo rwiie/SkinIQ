@@ -48,6 +48,14 @@ pip install -r requirements.txt -r requirements-dev.txt
 Add your OpenWeatherMap key to `.streamlit/secrets.toml` (copy `.streamlit/secrets.toml.example`).
 Never commit that file.
 
+## Prepare data
+
+```bash
+python training/prepare_data.py
+```
+
+See `data/README.md` for where the raw datasets go.
+
 ## Run
 
 ```bash
@@ -63,7 +71,7 @@ pytest
 ## Development roadmap
 
 1. Project setup ✅
-2. Data preparation (3.5)
+2. Data preparation (3.5) ✅
 3. Model training (3.6.1)
 4. USCE fusion layer (3.6.2)
 5. Knowledge-base rules (3.6.3)
