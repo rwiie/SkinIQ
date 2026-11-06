@@ -20,7 +20,7 @@ SKIN_CONDITIONS: tuple[str, ...] = (
 
 DATA_SPLIT = {"train": 0.70, "val": 0.15, "test": 0.15}
 
-IMAGE_SIZE = 384  # EfficientNet-V2-S default input resolution
+IMAGE_SIZE = 300  # EfficientNet-V2-S training resolution (fits a free Colab T4)
 
 
 def openweather_api_key() -> str | None:

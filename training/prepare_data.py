@@ -64,7 +64,9 @@ def _place(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def write_task(task: str, result: PrepResult, out_root: Path) -> dict:
+def write_task(task: str, result: PrepResult, out_root: Path, raw: Path) -> dict:
+    """CSV paths are relative to the parent of ``raw`` (e.g. ``raw/skin_type/...``)."""
+    base = raw.resolve().parent
     out = out_root / task
     if out.exists():
         shutil.rmtree(out)
@@ -85,7 +87,7 @@ def write_task(task: str, result: PrepResult, out_root: Path) -> dict:
             "width": w,
             "height": h,
             "low_res": int(min(w, h) < LOW_RES),
-            "original": r.path.relative_to(DATA_DIR).as_posix(),
+            "original": r.path.resolve().relative_to(base).as_posix(),
             "md5": r.md5,
         })
 
@@ -98,7 +100,7 @@ def write_task(task: str, result: PrepResult, out_root: Path) -> dict:
         writer = csv.writer(f)
         writer.writerow(["original", "label", "reason"])
         for r, reason in result.removed:
-            writer.writerow([r.path.relative_to(DATA_DIR).as_posix(), r.label, reason])
+            writer.writerow([r.path.resolve().relative_to(base).as_posix(), r.label, reason])
 
     return {
         "rows": rows,
@@ -178,7 +180,7 @@ def main() -> None:
         if missing:
             sys.exit(f"Missing dataset folders (see data/README.md):\n  " + "\n  ".join(missing))
         result = prepare(dirs, SPLITS, single_label=single_label, seed=args.seed)
-        stats = write_task(task, result, args.out)
+        stats = write_task(task, result, args.out, args.raw)
         check_no_leakage(stats["rows"])
         scanned = len(result.kept) + len(result.removed)
         sections.append(report_section(title, labels, stats, scanned))

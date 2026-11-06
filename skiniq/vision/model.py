@@ -1,0 +1,83 @@
+"""EfficientNet-V2 model and image transforms, shared by training and the app
+so both preprocess images the same way (proposal 3.6.1)."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import timm
+import torch
+from PIL import Image
+from torchvision import transforms as T
+
+from skiniq.config import IMAGE_SIZE
+
+DEFAULT_MODEL = "tf_efficientnetv2_s.in21k_ft_in1k"
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+
+
+def build_model(num_classes: int, model_name: str = DEFAULT_MODEL, pretrained: bool = True) -> torch.nn.Module:
+    return timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+
+
+class AddGaussianNoise:
+    """Light sensor-style noise on a [0, 1] tensor (proposal 3.6.1: noise injection)."""
+
+    def __init__(self, std: float = 0.02, p: float = 0.3) -> None:
+        self.std, self.p = std, p
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        if torch.rand(1).item() < self.p:
+            x = (x + torch.randn_like(x) * self.std).clamp(0, 1)
+        return x
+
+
+def train_transform(size: int = IMAGE_SIZE) -> T.Compose:
+    """Mild augmentation: the source images already contain Roboflow rotations and
+    mosaics. No hue jitter, because colour carries redness and pigmentation."""
+    return T.Compose([
+        T.RandomResizedCrop(size, scale=(0.7, 1.0)),
+        T.RandomHorizontalFlip(),
+        T.RandomRotation(10),
+        T.ColorJitter(brightness=0.15, contrast=0.15),
+        T.RandomApply([T.GaussianBlur(5, sigma=(0.1, 1.5))], p=0.2),
+        T.ToTensor(),
+        AddGaussianNoise(),
+        T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+    ])
+
+
+def eval_transform(size: int = IMAGE_SIZE) -> T.Compose:
+    return T.Compose([
+        T.Resize((size, size)),
+        T.ToTensor(),
+        T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+    ])
+
+
+@dataclass
+class SkinClassifier:
+    """A trained classifier loaded from a checkpoint written by training/train.py."""
+
+    model: torch.nn.Module
+    labels: list[str]
+    image_size: int
+    device: torch.device
+
+    @classmethod
+    def load(cls, path: str | Path, device: str | None = None) -> "SkinClassifier":
+        dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        ckpt = torch.load(path, map_location=dev, weights_only=False)
+        model = build_model(len(ckpt["labels"]), ckpt["model_name"], pretrained=False)
+        model.load_state_dict(ckpt["state_dict"])
+        model.to(dev).eval()
+        return cls(model=model, labels=ckpt["labels"], image_size=ckpt["image_size"], device=dev)
+
+    @torch.no_grad()
+    def predict(self, image: Image.Image) -> dict[str, float]:
+        """Return {label: probability}, highest first."""
+        x = eval_transform(self.image_size)(image.convert("RGB")).unsqueeze(0).to(self.device)
+        probs = self.model(x).softmax(dim=1)[0].tolist()
+        return dict(sorted(zip(self.labels, probs), key=lambda kv: kv[1], reverse=True))

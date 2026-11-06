@@ -72,7 +72,7 @@ pytest
 
 1. Project setup ✅
 2. Data preparation (3.5) ✅
-3. Model training (3.6.1)
+3. Model training (3.6.1) — code ready, run `training/train_colab.ipynb`
 4. USCE fusion layer (3.6.2)
 5. Knowledge-base rules (3.6.3)
 6. TF-IDF recommendation ranking (3.6.4)
