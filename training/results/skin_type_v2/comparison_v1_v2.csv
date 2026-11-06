@@ -1,0 +1,12 @@
+,v1,v2
+model,tf_efficientnetv2_s.in21k_ft_in1k,tf_efficientnetv2_b0.in1k
+best epoch,6,24
+test accuracy,0.3159,0.2979
+macro precision,0.308,0.2971
+macro recall,0.3097,0.3057
+macro F1,0.2946,0.283
+F1 combination,0.15,0.1722
+F1 dry,0.4235,0.2848
+F1 normal,0.3698,0.3702
+F1 oily,0.2349,0.3048
+train-val loss gap,1.142,0.604

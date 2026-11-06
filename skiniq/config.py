@@ -29,3 +29,10 @@ def openweather_api_key() -> str | None:
     The Streamlit app passes st.secrets["OPENWEATHER_API_KEY"] explicitly instead.
     """
     return os.environ.get("OPENWEATHER_API_KEY")
+
+# Weight of the image model's skin type prediction when fused with the questionnaire
+# (step 4). 0.0 = skin type comes from the questionnaire only.
+# Evidence: both skin type models stayed near chance on the leakage-free test split
+# (v1 EfficientNet-V2-S 31.6%, v2 EfficientNet-V2-B0 with anti-overfitting settings 29.8%;
+# chance is 25%). See training/results/ and training/README.md.
+SKIN_TYPE_IMAGE_WEIGHT = 0.0

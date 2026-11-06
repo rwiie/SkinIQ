@@ -1,0 +1,5 @@
+actual \ predicted,combination,dry,normal,oily
+combination,18,9,9,15
+dry,52,44,55,29
+normal,43,42,72,51
+oily,45,34,45,48

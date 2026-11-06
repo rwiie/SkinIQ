@@ -20,8 +20,7 @@ to retrain skin type with anti-overfitting settings (EfficientNet-V2-B0, lower l
 3 frozen-backbone epochs, strong augmentation, dropout and stochastic depth). It saves to
 `models/skin_type_v2/` and writes a v1 vs v2 comparison table and chart.
 
-Skin type is assessed from the questionnaire (`skiniq/questionnaire.py`), with the image model
-at most a supporting signal; see the comparison results before deciding its weight.
+Result: 29.8% test accuracy (v1: 31.6%). See **Results** below for the decision.
 
 ## Run locally (GPU)
 
@@ -54,6 +53,15 @@ Result files from each Colab run (everything except `model.pt`) are copied to
 |---|---|---:|---:|
 | `skin_condition` | EfficientNet-V2-S | 93.1% | 93.2% |
 | `skin_type` v1 | EfficientNet-V2-S | 31.6% | 29.5% |
+| `skin_type` v2 | EfficientNet-V2-B0, anti-overfitting settings | 29.8% | 28.3% |
+
+**Decision: skin type comes from the questionnaire** (`skiniq/questionnaire.py`,
+`SKIN_TYPE_IMAGE_WEIGHT = 0.0` in `skiniq/config.py`). v2 halved the gap between validation
+and training loss (1.14 → 0.60), so overfitting was reduced, but validation macro-F1 still
+plateaued at about 0.33, the same as v1 (see `results/skin_type_v2/comparison_v1_v2.png`).
+Two different set-ups reaching the same ceiling points to the data, not the training: with
+these labels, skin type cannot be predicted from photos much better than chance (25%). The
+CNN is used for the six skin conditions.
 
 ## Outputs (`models/<task>/`, not committed)
 
