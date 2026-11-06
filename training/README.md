@@ -45,6 +45,16 @@ python training/train.py --task skin_condition
 | Epochs | up to 20, early stop after 5 without validation macro-F1 gain | |
 | Model selection | best validation macro-F1 | accuracy alone hides weak minority classes |
 
+## Results
+
+Result files from each Colab run (everything except `model.pt`) are copied to
+[`results/`](results/) for the report. Model weights stay in Drive (`My Drive/SkinIQ/models/`).
+
+| Run | Model | Test accuracy | Macro F1 |
+|---|---|---:|---:|
+| `skin_condition` | EfficientNet-V2-S | 93.1% | 93.2% |
+| `skin_type` v1 | EfficientNet-V2-S | 31.6% | 29.5% |
+
 ## Outputs (`models/<task>/`, not committed)
 
 | File | Contents |
