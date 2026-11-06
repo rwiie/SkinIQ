@@ -26,6 +26,7 @@ OpenWeatherMap (temp/humidity/UV) ─┘
 |---|---|---|
 | `skiniq/vision/` | EfficientNet-V2 loading and inference | 3.6.1 |
 | `skiniq/environment.py` | OpenWeatherMap client | 3.7 |
+| `skiniq/questionnaire.py` | Appendix A questions and questionnaire-based skin type | 3.4 |
 | `skiniq/fusion.py` | Unified Skin Context Embedding (USCE) | 3.6.2 |
 | `skiniq/rules/` | Knowledge-base condition gates | 3.6.3 |
 | `skiniq/recommender.py` | TF-IDF + cosine similarity ranking | 3.6.4 |
@@ -72,7 +73,7 @@ pytest
 
 1. Project setup ✅
 2. Data preparation (3.5) ✅
-3. Model training (3.6.1) — code ready, run `training/train_colab.ipynb`
+3. Model training (3.6.1) ✅ skin condition 93.1% test accuracy; skin type 31.6% → v2 experiment in `training/train_skin_type_v2.ipynb`, skin type taken from the questionnaire
 4. USCE fusion layer (3.6.2)
 5. Knowledge-base rules (3.6.3)
 6. TF-IDF recommendation ranking (3.6.4)

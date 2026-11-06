@@ -6,7 +6,12 @@ Run training/prepare_data.py first. On Google Colab use training/train_colab.ipy
     python training/train.py --task skin_type
     python training/train.py --task skin_condition
 
-Writes to models/<task>/:
+    # skin type v2 experiment (anti-overfitting settings), saved to models/skin_type_v2/
+    python training/train.py --task skin_type --run-name skin_type_v2 \
+        --model tf_efficientnetv2_b0.in1k --img-size 224 --lr 1e-4 --freeze-epochs 3 \
+        --aug strong --drop-rate 0.3 --drop-path-rate 0.2 --epochs 25 --patience 6
+
+Writes to models/<run-name>/ (default: models/<task>/):
     model.pt              best checkpoint (by validation macro-F1) + labels and settings
     history.csv           loss / accuracy / macro-F1 per epoch
     metrics.json          test accuracy, precision, recall, F1 (macro, weighted, per class)
@@ -43,6 +48,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--task", required=True, choices=["skin_type", "skin_condition"])
     p.add_argument("--data-dir", type=Path, default=DATA_DIR / "processed")
     p.add_argument("--out-dir", type=Path, default=MODELS_DIR)
+    p.add_argument("--run-name", default=None, help="output subfolder (default: the task name)")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--no-pretrained", action="store_true", help="random init (offline smoke tests only)")
     p.add_argument("--img-size", type=int, default=IMAGE_SIZE)
@@ -52,6 +58,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--weight-decay", type=float, default=0.05)
     p.add_argument("--warmup-epochs", type=float, default=1.0)
     p.add_argument("--label-smoothing", type=float, default=0.1)
+    p.add_argument("--aug", choices=["mild", "strong"], default="mild")
+    p.add_argument("--drop-rate", type=float, default=0.0, help="dropout before the classifier")
+    p.add_argument("--drop-path-rate", type=float, default=0.0, help="stochastic depth")
+    p.add_argument("--freeze-epochs", type=int, default=0,
+                   help="train only the classifier head for the first N epochs")
     p.add_argument("--patience", type=int, default=5, help="early stop after N epochs without val macro-F1 gain")
     p.add_argument("--no-class-weights", action="store_true")
     p.add_argument("--num-workers", type=int, default=2)
@@ -92,6 +103,18 @@ def make_scheduler(optimizer, total_steps: int, warmup_steps: int):
         return 0.5 * (1 + math.cos(math.pi * progress))
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_at)
+
+
+def set_backbone_trainable(model: nn.Module, trainable: bool) -> None:
+    """Freeze or unfreeze everything except the classifier head.
+
+    Training only the new head first lets it fit before the pretrained features
+    are updated, which reduces early overfitting on small, noisy datasets.
+    """
+    for p in model.parameters():
+        p.requires_grad = trainable
+    for p in model.get_classifier().parameters():
+        p.requires_grad = True
 
 
 @torch.no_grad()
@@ -145,10 +168,10 @@ def main(argv=None) -> dict:
     seed_everything(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     root = args.data_dir / args.task
-    out = args.out_dir / args.task
+    out = args.out_dir / (args.run_name or args.task)
     out.mkdir(parents=True, exist_ok=True)
 
-    train_ds = load_split(root, "train", train_transform(args.img_size), args.max_samples, args.seed)
+    train_ds = load_split(root, "train", train_transform(args.img_size, args.aug), args.max_samples, args.seed)
     val_ds = load_split(root, "val", eval_transform(args.img_size), args.max_samples, args.seed)
     test_ds = load_split(root, "test", eval_transform(args.img_size), args.max_samples, args.seed)
     labels = train_ds.classes
@@ -161,7 +184,10 @@ def main(argv=None) -> dict:
     val_dl = DataLoader(val_ds, **loader_kw)
     test_dl = DataLoader(test_ds, **loader_kw)
 
-    model = build_model(len(labels), args.model, pretrained=not args.no_pretrained).to(device)
+    model = build_model(
+        len(labels), args.model, pretrained=not args.no_pretrained,
+        drop_rate=args.drop_rate, drop_path_rate=args.drop_path_rate,
+    ).to(device)
     weights = None if args.no_class_weights else class_weights(train_ds.targets, len(labels))
     if weights is not None:
         print("  class weights:", {c: round(w, 2) for c, w in zip(labels, weights.tolist())})
@@ -175,6 +201,7 @@ def main(argv=None) -> dict:
 
     history, best_f1, best_epoch, stale = [], -1.0, 0, 0
     for epoch in range(1, args.epochs + 1):
+        set_backbone_trainable(model, trainable=epoch > args.freeze_epochs)
         model.train()
         t0, run_loss, seen = time.time(), 0.0, 0
         for x, y in train_dl:
@@ -235,6 +262,7 @@ def main(argv=None) -> dict:
     cm = confusion_matrix(test["targets"], test["preds"], labels=list(range(len(labels))))
     metrics = {
         "task": args.task,
+        "run_name": args.run_name or args.task,
         "model": args.model,
         "image_size": args.img_size,
         "best_epoch": best_epoch,
@@ -254,7 +282,7 @@ def main(argv=None) -> dict:
         for label, r in zip(labels, cm.tolist()):
             w.writerow([label] + r)
     save_confusion_png(cm, labels, out / "confusion_matrix.png",
-                       f"{args.task} — test accuracy {metrics['test_accuracy']:.1%}")
+                       f"{args.run_name or args.task} — test accuracy {metrics['test_accuracy']:.1%}")
 
     print(f"  best epoch {best_epoch}: val macro-F1 {best_f1:.4f}")
     print(f"  TEST accuracy {metrics['test_accuracy']:.4f}  macro-F1 {metrics['test_macro']['f1-score']:.4f}")

@@ -1,0 +1,65 @@
+{
+  "task": "skin_type",
+  "model": "tf_efficientnetv2_s.in21k_ft_in1k",
+  "image_size": 300,
+  "best_epoch": 6,
+  "epochs_run": 11,
+  "val_macro_f1": 0.3329,
+  "test_size": 611,
+  "test_accuracy": 0.3159,
+  "test_macro": {
+    "precision": 0.308,
+    "recall": 0.3097,
+    "f1-score": 0.2946
+  },
+  "test_weighted": {
+    "precision": 0.3565,
+    "recall": 0.3159,
+    "f1-score": 0.3293
+  },
+  "per_class": {
+    "combination": {
+      "precision": 0.1007,
+      "recall": 0.2941,
+      "f1-score": 0.15,
+      "support": 51.0
+    },
+    "dry": {
+      "precision": 0.45,
+      "recall": 0.4,
+      "f1-score": 0.4235,
+      "support": 180.0
+    },
+    "normal": {
+      "precision": 0.4034,
+      "recall": 0.3413,
+      "f1-score": 0.3698,
+      "support": 208.0
+    },
+    "oily": {
+      "precision": 0.2778,
+      "recall": 0.2035,
+      "f1-score": 0.2349,
+      "support": 172.0
+    }
+  },
+  "settings": {
+    "task": "skin_type",
+    "data_dir": "/content/SkinIQ/data/processed",
+    "out_dir": "/content/drive/MyDrive/SkinIQ/models",
+    "model": "tf_efficientnetv2_s.in21k_ft_in1k",
+    "no_pretrained": "False",
+    "img_size": "300",
+    "epochs": "20",
+    "batch_size": "32",
+    "lr": "0.0003",
+    "weight_decay": "0.05",
+    "warmup_epochs": "1.0",
+    "label_smoothing": "0.1",
+    "patience": "5",
+    "no_class_weights": "False",
+    "num_workers": "2",
+    "max_samples": "None",
+    "seed": "42"
+  }
+}

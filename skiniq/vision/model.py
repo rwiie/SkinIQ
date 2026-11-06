@@ -18,8 +18,20 @@ IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
-def build_model(num_classes: int, model_name: str = DEFAULT_MODEL, pretrained: bool = True) -> torch.nn.Module:
-    return timm.create_model(model_name, pretrained=pretrained, num_classes=num_classes)
+def build_model(
+    num_classes: int,
+    model_name: str = DEFAULT_MODEL,
+    pretrained: bool = True,
+    drop_rate: float = 0.0,
+    drop_path_rate: float = 0.0,
+) -> torch.nn.Module:
+    return timm.create_model(
+        model_name,
+        pretrained=pretrained,
+        num_classes=num_classes,
+        drop_rate=drop_rate,
+        drop_path_rate=drop_path_rate,
+    )
 
 
 class AddGaussianNoise:
@@ -34,19 +46,30 @@ class AddGaussianNoise:
         return x
 
 
-def train_transform(size: int = IMAGE_SIZE) -> T.Compose:
-    """Mild augmentation: the source images already contain Roboflow rotations and
-    mosaics. No hue jitter, because colour carries redness and pigmentation."""
-    return T.Compose([
-        T.RandomResizedCrop(size, scale=(0.7, 1.0)),
+def train_transform(size: int = IMAGE_SIZE, strength: str = "mild") -> T.Compose:
+    """Training augmentation. Never shifts hue, because colour carries redness and pigmentation.
+
+    - ``mild``: the default; the source images already contain Roboflow rotations and mosaics.
+    - ``strong``: heavier cropping, lighting changes and random erasing, to fight overfitting
+      on small or noisy datasets (used for the skin type v2 experiment).
+    """
+    if strength not in ("mild", "strong"):
+        raise ValueError(f"unknown augmentation strength: {strength}")
+    strong = strength == "strong"
+    steps = [
+        T.RandomResizedCrop(size, scale=(0.5, 1.0) if strong else (0.7, 1.0)),
         T.RandomHorizontalFlip(),
-        T.RandomRotation(10),
-        T.ColorJitter(brightness=0.15, contrast=0.15),
+        T.RandomRotation(15 if strong else 10),
+        T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.1) if strong
+        else T.ColorJitter(brightness=0.15, contrast=0.15),
         T.RandomApply([T.GaussianBlur(5, sigma=(0.1, 1.5))], p=0.2),
         T.ToTensor(),
         AddGaussianNoise(),
         T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
-    ])
+    ]
+    if strong:
+        steps.append(T.RandomErasing(p=0.25, scale=(0.02, 0.15)))
+    return T.Compose(steps)
 
 
 def eval_transform(size: int = IMAGE_SIZE) -> T.Compose:

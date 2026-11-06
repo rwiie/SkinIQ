@@ -10,6 +10,19 @@ in Colab, set **Runtime → T4 GPU**, then **Run all**. It mounts your Drive, un
 datasets, runs `prepare_data.py`, trains both models and saves results to
 `My Drive/SkinIQ/models/<task>/`.
 
+## Skin type v2 experiment
+
+The first skin type model reached only 31.6% test accuracy (chance is 25%): it memorised the
+training images by epoch 6 while validation accuracy stayed at 30–35%. The skin condition model,
+trained with the same code, reached 93.1%. Open
+[`train_skin_type_v2.ipynb`](https://colab.research.google.com/github/rwiie/SkinIQ/blob/main/training/train_skin_type_v2.ipynb)
+to retrain skin type with anti-overfitting settings (EfficientNet-V2-B0, lower learning rate,
+3 frozen-backbone epochs, strong augmentation, dropout and stochastic depth). It saves to
+`models/skin_type_v2/` and writes a v1 vs v2 comparison table and chart.
+
+Skin type is assessed from the questionnaire (`skiniq/questionnaire.py`), with the image model
+at most a supporting signal; see the comparison results before deciding its weight.
+
 ## Run locally (GPU)
 
 ```bash
