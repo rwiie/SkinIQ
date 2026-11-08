@@ -9,6 +9,8 @@ They are shared with the project via Google Drive.
 | `raw/skin_condition/` | 8,843 images in `acne/ blackheades/ pigmentation/ pores/ redness/ wrinkles/` | Kaggle, drishya "Skin Issues Dataset" (Roboflow export) |
 | `raw/skin_problem/` | 3,240 images (640×640) in `train/ valid/ test/` with COCO bounding boxes for 10 classes (`_annotations.coco.json`) | Roboflow Universe, *Skin-Problem-Detection-Relabel-Clean3* v1 (parin-kittipongdaja), **CC BY 4.0** |
 | `raw/products.csv` | 1,682 Korean skincare products: brand, product, category, ingredients, afterUse tags | Product Ingredients List |
+| `knowledge/ingredient_aliases.csv` | Ingredient standardization table (proposal Table 3.5.2.1) | Proposal + common/INCI names; see `docs/ingredients.md` |
+| `knowledge/ingredient_functions.csv` | Ingredient-function mapping table (proposal Table 3.5.2.2) | Proposal literature review; rows marked *verify* need a check |
 | `processed/<task>/{train,val,test}/<label>/` | Cleaned, leakage-free 70/15/15 split (hard links to `raw/`) | `training/prepare_data.py` |
 | `processed/<task>/manifest.csv` | One row per kept image: label, split, photo group, size, low-res flag | `training/prepare_data.py` |
 | `processed/<task>/removed.csv` | Every dropped image and why | `training/prepare_data.py` |

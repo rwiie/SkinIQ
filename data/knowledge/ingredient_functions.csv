@@ -1,0 +1,60 @@
+ingredient,pattern,group,functions,concerns,source
+Salicylic Acid,^(salicylic acid|capryloyl salicylic acid)\b,bha,exfoliant|acne_control|pore_clearing,acne|blackheads|enlarged_pores,Schachner et al. (2023); Li et al. (2020)
+Betaine Salicylate,^betaine salicylate\b,bha,exfoliant|acne_control|pore_clearing,acne|blackheads|enlarged_pores,Schachner et al. (2023); Li et al. (2020)
+Benzoyl Peroxide,^benzoyl peroxide\b,,acne_control,acne,Schachner et al. (2023); Li et al. (2020)
+"Glycolic, Lactic, Mandelic, Tartaric Acid (AHA)",^(glycolic|lactic|mandelic|tartaric) acid\b,aha,exfoliant|anti_aging|brightening,wrinkles|hyperpigmentation,Hakulinen (2025)
+"Gluconolactone, Lactobionic Acid (PHA)",^(gluconolactone|lactobionic acid)\b,pha,gentle_exfoliant|hydration,hyperpigmentation|dryness,Hakulinen (2025); Schachner et al. (2023)
+"Retinol, Retinal, Retinyl Esters (retinoids)",^(retinol|retinal|retinaldehyde|retinyl \w+|hydroxypinacolone retinoate|tretinoin|adapalene)\b,retinoid,anti_aging|acne_control|collagen_support,wrinkles|acne,Hakulinen (2025); Narsa et al. (2024)
+Bakuchiol,^bakuchiol\b,,anti_aging|antioxidant,wrinkles,Not in proposal: verify (retinol alternative)
+Ascorbic Acid (pure vitamin C),^(l-)?ascorbic acid\b,pure_vitamin_c,antioxidant|brightening,hyperpigmentation|wrinkles,Hakulinen (2025); Suarantika et al. (2025)
+Vitamin C Derivatives,ascorbyl|ascorbic acid,vitamin_c,antioxidant|brightening,hyperpigmentation|wrinkles,Hakulinen (2025); Suarantika et al. (2025)
+Niacinamide,^niacinamide\b,niacinamide,brightening|sebum_regulation|anti_inflammatory,hyperpigmentation|acne|enlarged_pores|redness|oiliness,Hakulinen (2025); Schachner et al. (2023)
+"Arbutin, Alpha-Arbutin",^(alpha-)?arbutin\b,,brightening,hyperpigmentation,Li et al. (2020) (tyrosinase inhibitors); MFDS Korea functional ingredient: verify
+Tranexamic Acid,^tranexamic acid\b,,brightening,hyperpigmentation,Not in proposal: verify
+Azelaic Acid,^azelaic acid\b,,acne_control|brightening|anti_inflammatory,acne|hyperpigmentation|redness,Not in proposal: verify
+Kojic Acid,^kojic acid\b,,brightening,hyperpigmentation,Li et al. (2020) (tyrosinase inhibitors)
+Hydroquinone,^hydroquinone\b,hydroquinone,brightening,hyperpigmentation,Kim et al. (2017)
+Glycyrrhiza Glabra Root Extract (licorice),^glycyrrhiza (glabra|uralensis|inflata)\b|dipotassium glycyrrhizate,,soothing|brightening,redness|hyperpigmentation,Not in proposal: verify
+"Hyaluronic Acid, Sodium Hyaluronate",hyaluron,hyaluronic_acid,humectant|hydration|plumping,dryness|wrinkles,Hakulinen (2025); Pavlou et al. (2021)
+Glycerin,^glycerin$,,humectant|hydration,dryness,Pavlou et al. (2021)
+"Butylene Glycol, Propanediol, Pentylene Glycol",^(butylene glycol|propanediol|pentylene glycol|dipropylene glycol|methylpropanediol)$,,humectant|solvent,dryness,Common cosmetic function: verify in CosIng
+Betaine,^betaine$,,humectant|hydration,dryness,Common cosmetic function: verify in CosIng
+Trehalose,^trehalose$,,humectant|hydration,dryness,Common cosmetic function: verify in CosIng
+Beta-Glucan,^beta-glucan\b,,hydration|soothing,dryness|redness,Not in proposal: verify
+Panthenol,^panthenol\b,panthenol,hydration|soothing|barrier_repair,dryness|redness,Not in proposal: verify
+Ceramides,^ceramide,ceramide,barrier_repair|soothing,dryness|redness|sensitivity,Schachner et al. (2023)
+"Cholesterol, Phytosphingosine",^(cholesterol|phytosphingosine)$,,barrier_repair,dryness|sensitivity,Not in proposal: verify
+"Squalane, Caprylic/Capric Triglyceride",^(squalane|caprylic/capric triglyceride|cetyl ethylhexanoate)$,,emollient,dryness,Common cosmetic function: verify in CosIng
+"Shea Butter, Plant Butters",butter$,,emollient|occlusive,dryness,Pavlou et al. (2021)
+"Petrolatum, Waxes",^(petrolatum|paraffin|cera alba|beeswax|candelilla cera|copernicia cerifera cera|\w+ wax)\b,,occlusive,dryness,Pavlou et al. (2021)
+"Dimethicone, Siloxanes",^(dimethicone|cyclopentasiloxane|cyclohexasiloxane)\b,,occlusive|emollient,dryness,Common cosmetic function: verify in CosIng
+Centella Asiatica (cica),centella|madecassoside|asiaticoside|madecassic acid|asiatic acid,centella,soothing|anti_inflammatory|barrier_repair,redness|acne|sensitivity,Not in proposal: verify
+Allantoin,^allantoin$,,soothing,redness|sensitivity,Common cosmetic function: verify in CosIng
+Aloe Barbadensis Leaf,^aloe barbadensis leaf,,soothing|hydration,redness|dryness,Not in proposal: verify
+Snail Secretion Filtrate,snail secretion filtrate,,hydration|repair,dryness|acne,Not in proposal: verify
+Propolis Extract,propolis,,soothing|antioxidant,acne|redness,Not in proposal: verify
+Adenosine,^adenosine$,,anti_aging,wrinkles,MFDS Korea anti-wrinkle functional ingredient: verify
+Peptides,peptide-\d+|^palmitoyl|^acetyl hexapeptide|^copper tripeptide,,anti_aging|collagen_support,wrinkles,Hakulinen (2025)
+"Tocopherol (vitamin E)",^tocopher,,antioxidant,wrinkles,Hakulinen (2025)
+Camellia Sinensis Leaf (green tea),^camellia sinensis leaf,,antioxidant|soothing,redness|wrinkles,Not in proposal: verify
+Zinc PCA,^zinc pca$,,sebum_regulation|acne_control,acne|oiliness,Not in proposal: verify
+Sulfur,^sulfur$,,acne_control,acne,Not in proposal: verify
+"Kaolin, Bentonite (clays)",^(kaolin|bentonite|montmorillonite)\b,,oil_absorbing|pore_clearing,oiliness|enlarged_pores|blackheads,Not in proposal: verify
+Charcoal Powder,charcoal,,oil_absorbing|pore_clearing,oiliness|blackheads,Not in proposal: verify
+"Zinc Oxide, Titanium Dioxide (mineral filters)",^(zinc oxide|titanium dioxide)\b,mineral_filter,uv_filter,sun_damage,WHO (2002); UV filter function: verify in CosIng
+Chemical UV Filters,ethylhexyl methoxycinnamate|octinoxate|avobenzone|butyl methoxydibenzoylmethane|homosalate|octisalate|ethylhexyl salicylate|oxybenzone|benzophenone|octocrylene|bis-ethylhexyloxyphenol|diethylamino hydroxybenzoyl|ethylhexyl triazone|drometrizole|polysilicone-15|isoamyl p-methoxycinnamate|methylene bis-benzotriazolyl|diethylhexyl butamido triazone|phenylbenzimidazole sulfonic acid|terephthalylidene dicamphor,chemical_filter,uv_filter,sun_damage,WHO (2002); UV filter function: verify in CosIng
+Parfum (fragrance),^parfum$,fragrance,fragrance|irritant_risk,,Hakulinen (2025); Schachner et al. (2023)
+Fragrance Allergens,^(limonene|linalool|citronellol|geraniol|citral|eugenol|coumarin|benzyl alcohol|benzyl benzoate|benzyl salicylate|hexyl cinnamal|farnesol)$,,fragrance|irritant_risk,,SCCS fragrance allergen list: verify
+Essential Oils,(lavandula|lavender|bergamia|bergamot|citrus [\w ]*(peel|fruit|leaf|flower) oil|lemon|orange|grapefruit|lime|melaleuca|tea tree|mentha|peppermint|spearmint|eucalyptus|rosmarinus|rosemary|pelargonium|geranium|rosa [\w ]*flower oil|ylang|cananga|chamomilla [\w ]*oil|anthemis [\w ]*oil|cinnamomum|clove|eugenia caryophyllus|juniperus|cymbopogon|lemongrass|patchouli|pogostemon|santalum|cupressus|thymus|origanum|salvia sclarea|citronella)[\w ]*oil\b,essential_oil,fragrance|irritant_risk,,Hakulinen (2025); Schachner et al. (2023)
+"Alcohol, Alcohol Denat. (drying alcohol)",^(alcohol|alcohol denat\.?|ethanol|sd alcohol[\w\- ]*|isopropyl alcohol)$,drying_alcohol,solvent|drying|irritant_risk,,Product dataset tags (Drying); verify
+"Fatty Alcohols (cetearyl, cetyl, stearyl)",^(cetearyl|cetyl|stearyl|behenyl) alcohol$,,emollient|thickener,dryness,Common cosmetic function: verify in CosIng
+Sulfate Surfactants,^(sodium lauryl sulfate|sodium laureth sulfate|ammonium lauryl sulfate)$,,cleansing|irritant_risk,,Not in proposal: verify
+Mild Surfactants,^(cocamidopropyl betaine|sodium cocoyl glycinate|sodium lauroyl methyl isethionate|disodium cocoamphodiacetate|coco-glucoside|decyl glucoside|potassium cocoyl glycinate)$,,cleansing,,Common cosmetic function: verify in CosIng
+"Butylated Hydroxyanisole (BHA), BHT",^(butylated hydroxyanisole|bht|butylated hydroxytoluene)$,,antioxidant_preservative,,Common cosmetic function: verify in CosIng
+Water,^water$,,solvent,,Common cosmetic function: verify in CosIng
+"1,2-Hexanediol, Ethylhexylglycerin, Caprylyl Glycol","^(1,2-hexanediol|ethylhexylglycerin|caprylyl glycol|glyceryl caprylate|hydroxyacetophenone)$",,preservative_booster|humectant,,Common cosmetic function: verify in CosIng
+"Phenoxyethanol, Sodium Benzoate, Potassium Sorbate",^(phenoxyethanol|sodium benzoate|potassium sorbate|chlorphenesin|methylparaben|propylparaben|benzoic acid|sorbic acid)$,,preservative,,Common cosmetic function: verify in CosIng
+"Disodium EDTA, Trisodium Ethylenediamine Disuccinate",^(disodium edta|tetrasodium edta|trisodium ethylenediamine disuccinate|sodium phytate)$,,chelating,,Common cosmetic function: verify in CosIng
+"Xanthan Gum, Carbomer, Acrylates Crosspolymers",^(xanthan gum|carbomer|acrylates/c10-30 alkyl acrylate crosspolymer|hydroxyethylcellulose|cellulose gum|sclerotium gum|ammonium acryloyldimethyltaurate/vp copolymer|polyacrylate crosspolymer-6)$,,thickener,,Common cosmetic function: verify in CosIng
+"Citric Acid, Tromethamine, Arginine (pH adjusters)",^(citric acid|tromethamine|arginine|sodium hydroxide|potassium hydroxide|sodium citrate|aminomethyl propanol|triethanolamine)$,,ph_adjuster,,Common cosmetic function: verify in CosIng
+"Glyceryl Stearate, Stearic Acid, Lecithin, Polysorbates",^(glyceryl stearate|stearic acid|hydrogenated lecithin|lecithin|polysorbate \d+|peg-100 stearate|sorbitan \w+|cetearyl olivate|sorbitan olivate|polyglyceryl-\d+ \w+)$,,emulsifier,,Common cosmetic function: verify in CosIng

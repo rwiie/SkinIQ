@@ -41,39 +41,75 @@ ROUTINE_STEP = {
     "Overnight Mask": "mask",
 }
 
-# Regexes matched against each ingredient name (lower case, whole ingredient).
-INGREDIENT_GROUPS: dict[str, str] = {
-    "retinoid": r"^(retinol|retinal|retinaldehyde|retinyl \w+|hydroxypinacolone retinoate|tretinoin|adapalene)\b",
-    "aha": r"^(glycolic|lactic|mandelic|tartaric) acid\b",
-    "bha": r"^(salicylic acid|betaine salicylate|capryloyl salicylic acid)\b",
-    "pha": r"^(gluconolactone|lactobionic acid)\b",
-    "vitamin_c": r"ascorbic acid|ascorbyl",
-    "pure_vitamin_c": r"^(l-)?ascorbic acid\b",
-    "niacinamide": r"^niacinamide\b",
-    "hydroquinone": r"^hydroquinone\b",
-    "fragrance": r"^(fragrance|parfum|perfume|aroma)\b",
-    "drying_alcohol": r"^(alcohol|alcohol denat\.?|ethanol|sd alcohol[\w\- ]*|isopropyl alcohol)$",
-    "essential_oil": (
-        r"(lavandula|lavender|bergamia|bergamot|citrus [\w ]*(peel|fruit|leaf|flower) oil|lemon|orange|grapefruit|"
-        r"lime|melaleuca|tea tree|mentha|peppermint|spearmint|eucalyptus|rosmarinus|rosemary|pelargonium|"
-        r"geranium|rosa [\w ]*flower oil|ylang|cananga|chamomilla [\w ]*oil|anthemis [\w ]*oil|cinnamomum|"
-        r"clove|eugenia caryophyllus|juniperus|cymbopogon|lemongrass|patchouli|pogostemon|santalum|"
-        r"cupressus|thymus|origanum|salvia sclarea|citronella)[\w ]*oil\b"
-    ),
-    "chemical_filter": (
-        r"ethylhexyl methoxycinnamate|octinoxate|avobenzone|butyl methoxydibenzoylmethane|homosalate|"
-        r"octisalate|ethylhexyl salicylate|oxybenzone|benzophenone|octocrylene|bis-ethylhexyloxyphenol|"
-        r"diethylamino hydroxybenzoyl|ethylhexyl triazone|drometrizole|polysilicone-15|"
-        r"isoamyl p-methoxycinnamate|methylene bis-benzotriazolyl|diethylhexyl butamido triazone|"
-        r"phenylbenzimidazole sulfonic acid|terephthalylidene dicamphor"
-    ),
-    "mineral_filter": r"^(zinc oxide|titanium dioxide)\b",
-    "hyaluronic_acid": r"hyaluron",
-    "ceramide": r"^ceramide",
-    "centella": r"centella|madecassoside|asiaticoside|madecassic|asiatic acid",
-    "panthenol": r"^panthenol\b",
-}
-_COMPILED = {k: re.compile(v) for k, v in INGREDIENT_GROUPS.items()}
+KNOWLEDGE_DIR = DATA_DIR / "knowledge"
+ALIASES_CSV = KNOWLEDGE_DIR / "ingredient_aliases.csv"
+FUNCTIONS_CSV = KNOWLEDGE_DIR / "ingredient_functions.csv"
+_PERCENT = re.compile(r"\s*\d+(\.\d+)?\s*%.*$")
+
+
+@dataclass(frozen=True)
+class IngredientRule:
+    """One row of the ingredient-function mapping table (proposal Table 3.5.2.2)."""
+
+    ingredient: str
+    pattern: re.Pattern
+    group: str
+    functions: tuple[str, ...]
+    concerns: tuple[str, ...]
+    source: str
+
+
+@lru_cache(maxsize=1)
+def load_aliases(path: str | Path = ALIASES_CSV) -> dict[str, str]:
+    df = pd.read_csv(path)
+    return {v.strip().lower(): s.strip() for v, s in zip(df.variant, df.standard_name)}
+
+
+@lru_cache(maxsize=1)
+def load_ingredient_table(path: str | Path = FUNCTIONS_CSV) -> tuple[IngredientRule, ...]:
+    df = pd.read_csv(path).fillna("")
+    return tuple(
+        IngredientRule(r.ingredient, re.compile(r.pattern), r.group,
+                       tuple(f for f in r.functions.split("|") if f), tuple(c for c in r.concerns.split("|") if c),
+                       r.source)
+        for r in df.itertuples()
+    )
+
+
+def standardize(name: str) -> str:
+    """Standard ingredient name (proposal Table 3.5.2.1): strip concentrations and map
+    common or non-INCI names to their INCI name, e.g. 'Vitamin C' -> 'Ascorbic Acid',
+    'Salicylic Acid 2%' -> 'Salicylic Acid', 'Aqua' -> 'Water'."""
+    clean = _PERCENT.sub("", name).strip(" .*")
+    clean = re.sub(r"\s+", " ", clean)
+    aliases = load_aliases()
+    key = clean.lower()
+    if key in aliases:
+        return aliases[key]
+    if "(" in key:  # e.g. "Fragrance (Parfum)", "Water (Aqua)"
+        outer, inner = key.split("(", 1)
+        standards = {s.lower(): s for s in aliases.values()}
+        for part in (outer.strip(), inner.strip(" )")):
+            if part in aliases:
+                return aliases[part]
+            if part in standards:
+                return standards[part]
+    return clean
+
+
+def ingredient_info(name: str) -> list[IngredientRule]:
+    """Rows of the mapping table that match one (standardized) ingredient."""
+    low = name.lower()
+    return [r for r in load_ingredient_table() if r.pattern.search(low)]
+
+
+def _group_patterns() -> dict[str, list[re.Pattern]]:
+    groups: dict[str, list[re.Pattern]] = {}
+    for r in load_ingredient_table():
+        if r.group:
+            groups.setdefault(r.group, []).append(r.pattern)
+    return groups
+
 
 EXFOLIANT_GROUPS = ("aha", "bha", "pha")
 
@@ -88,14 +124,20 @@ class Product:
     ingredients: tuple[str, ...]
     tags: frozenset[str]
     groups: frozenset[str] = field(default_factory=frozenset)
+    functions: frozenset[str] = field(default_factory=frozenset)
+    concerns: frozenset[str] = field(default_factory=frozenset)  # concerns its ingredients address
 
     def has(self, group: str) -> bool:
         return group in self.groups
 
     def matching(self, group: str) -> list[str]:
         """Ingredients of this product in a group (for explanations)."""
-        rx = _COMPILED[group]
-        return [i for i in self.ingredients if rx.search(i.lower())]
+        patterns = _group_patterns()[group]
+        return [i for i in self.ingredients if any(rx.search(i.lower()) for rx in patterns)]
+
+    def with_function(self, function: str) -> list[str]:
+        """Ingredients of this product with a function, e.g. 'humectant' (for explanations)."""
+        return [i for i in self.ingredients if any(function in r.functions for r in ingredient_info(i))]
 
     @property
     def exfoliants(self) -> list[str]:
@@ -107,19 +149,20 @@ class Product:
 
 
 def split_ingredients(text: str) -> tuple[str, ...]:
-    """Split on commas, but keep numbers like '1,2-Hexanediol' together."""
+    """Split on commas (keeping '1,2-Hexanediol' whole) and standardize each name."""
     parts = re.split(r"(?<!\d),|,(?!\d)", text)  # keep "1,2-Hexanediol" whole
-    return tuple(p.strip() for p in parts if p.strip())
+    names = (standardize(p) for p in parts if p.strip())
+    return tuple(dict.fromkeys(n for n in names if n))  # drop duplicates, keep order
 
 
 def ingredient_groups(ingredients: tuple[str, ...]) -> frozenset[str]:
-    found = set()
-    for ing in ingredients:
-        low = ing.lower()
-        for group, rx in _COMPILED.items():
-            if rx.search(low):
-                found.add(group)
-    return frozenset(found)
+    return frozenset(r.group for i in ingredients for r in ingredient_info(standardize(i)) if r.group)
+
+
+def ingredient_functions(ingredients: tuple[str, ...]) -> tuple[frozenset[str], frozenset[str]]:
+    """(functions, concerns) of a product's ingredients from the mapping table."""
+    rows = [r for i in ingredients for r in ingredient_info(standardize(i))]
+    return frozenset(f for r in rows for f in r.functions), frozenset(c for r in rows for c in r.concerns)
 
 
 def clean_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
@@ -139,6 +182,7 @@ def load_products(path: str | Path = PRODUCTS_CSV) -> tuple[Product, ...]:
     products = []
     for i, r in enumerate(df.itertuples()):
         ingredients = split_ingredients(r.ingredients)
+        functions, concerns = ingredient_functions(ingredients)
         products.append(Product(
             id=i,
             brand=r.brand,
@@ -148,5 +192,7 @@ def load_products(path: str | Path = PRODUCTS_CSV) -> tuple[Product, ...]:
             ingredients=ingredients,
             tags=frozenset(t.strip() for t in r.afterUse.split(",") if t.strip()),
             groups=ingredient_groups(ingredients),
+            functions=functions,
+            concerns=concerns,
         ))
     return tuple(products)

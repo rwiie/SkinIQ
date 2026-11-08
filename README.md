@@ -73,7 +73,7 @@ pytest
 ## Development roadmap
 
 1. Project setup ✅
-2. Data preparation (3.5) ✅
+2. Data preparation (3.5) ✅ images; product ingredients standardized and mapped to functions (`docs/ingredients.md`)
 3. Model training (3.6.1) ✅ skin condition 93.1% test accuracy; skin type 31.6% (v1) / 29.8% (v2), so skin type comes from the questionnaire (see `training/README.md`)
    - Multi-label skin concerns (6 sigmoid outputs + YuNet regions): labelling in progress, see `training/README.md`
 4. USCE fusion layer (3.6.2) ✅ see `docs/usce.md`
