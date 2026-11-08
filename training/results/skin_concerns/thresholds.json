@@ -1,0 +1,8 @@
+{
+  "acne": 0.9,
+  "blackheads": 0.9,
+  "hyperpigmentation": 0.95,
+  "redness": 0.95,
+  "enlarged_pores": 0.3,
+  "wrinkles": 0.65
+}
