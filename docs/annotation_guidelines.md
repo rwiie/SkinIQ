@@ -30,7 +30,7 @@ the labels are consistent.
 | **Hyperpigmentation** | Flat areas darker than the surrounding skin: dark spots, sun spots, melasma patches, post-acne dark marks, dense freckling | A single mole; shadows; natural under-eye darkness |
 | **Redness** | Diffuse red or flushed areas (cheeks, nose, chin), rosacea, visible irritation or broken capillaries | Red acne bumps alone (→ acne); blush or lipstick; a red colour cast over the whole photo from lighting |
 | **Enlarged pores** | Clearly visible open pores or "orange-peel" texture, usually on the cheeks or nose | Pores you can only see by zooming into a high-resolution photo; blackheads alone (→ blackheads) |
-| **Wrinkles** | Visible lines or folds: forehead lines, crow's feet, lines around the mouth, deep nasolabial folds, crepey texture | Smooth skin with a temporary crease from a big smile or squint only |
+| **Wrinkles** | Any visible lines or folds, **including fine lines**: forehead lines, crow's feet, under-eye lines, lines around the mouth, nasolabial folds, crepey texture | Smooth skin with a temporary crease from a big smile or squint only |
 
 **Clear skin:** leave all six unticked and press **Save & next**.
 
