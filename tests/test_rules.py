@@ -206,7 +206,9 @@ def test_retinoid_with_acid_caution_and_sensitive_exclude(user):
     p = product("Retinol", "Glycolic Acid")
     assert fired(user(), p, "I1_retinoid_acid").action is Action.CAUTION
     assert fired(user(), p, "I1_retinoid_acid_sensitive") is None
-    assert fired(user(sensitivity="highly"), p, "I1_retinoid_acid_sensitive").action is Action.EXCLUDE
+    sensitive = user(sensitivity="highly")
+    assert fired(sensitive, p, "I1_retinoid_acid_sensitive").action is Action.EXCLUDE
+    assert fired(sensitive, p, "I1_retinoid_acid") is None  # excluded, not also cautioned
 
 
 def test_multi_acid_caution_for_sensitive(user):
@@ -215,23 +217,44 @@ def test_multi_acid_caution_for_sensitive(user):
     assert fired(user(), p, "I2_multi_acid_sensitive") is None
 
 
-def test_vitamin_c_with_acid_caution(user):
-    assert fired(user(), product("Ascorbic Acid", "Lactic Acid"), "I3_vitc_acid") is not None
-    assert fired(user(), product("Ascorbyl Glucoside", "Lactic Acid"), "I3_vitc_acid") is None  # derivative
+def test_hydroquinone_with_retinoid_caution(user):
+    f = fired(user(), product("Hydroquinone", "Retinol"), "I3_hydroquinone_retinoid")
+    assert f.action is Action.CAUTION and f.weight < 0
+    assert fired(user(), product("Hydroquinone"), "I3_hydroquinone_retinoid") is None
+
+
+def test_sensitive_prefers_pha_not_aha(user):
+    u = user(sensitivity="highly")
+    assert fired(u, product("Gluconolactone"), "I4_sensitive_pha").action is Action.PREFER
+    assert fired(u, product("Gluconolactone", "Glycolic Acid"), "I4_sensitive_pha") is None
+    assert fired(user(), product("Gluconolactone"), "I4_sensitive_pha") is None
+
+
+def test_vitamin_c_with_acids_is_not_penalised(user):
+    """Removed rule: vitamin C + acids has weak evidence, so no finding at all."""
+    a = assess(product("Ascorbic Acid", "Lactic Acid"), user(), ALL_RULES)
+    assert not any("vitamin C" in f.reason for f in a.findings)
 
 
 def test_routine_conflicts():
     night = product("Retinol", name="Night")
     peel = product("Glycolic Acid", name="Peel")
-    serum = product("Ascorbic Acid", name="Vit C")
     bha = product("Salicylic Acid", name="BHA")
-    reasons = {c.reason for c in check_routine([night, peel, serum, bha])}
-    assert reasons == {
+    hq = product("Hydroquinone", name="HQ")
+    conflicts = check_routine([night, peel, bha, hq])
+    assert {c.reason for c in conflicts} == {
         "Retinoid and exfoliating acid in the same routine",
-        "Retinoid and pure vitamin C in the same routine",
+        "Hydroquinone and retinoid in the same routine",
         "Two exfoliating products in the same routine",
     }
+    assert all(c.source for c in conflicts)
+    assert check_routine([product("Ascorbic Acid"), night]) == []  # vitamin C + retinoid no longer flagged
     assert check_routine([product("Glycerin"), product("Niacinamide")]) == []
+
+
+def test_every_rule_has_a_source():
+    assert all(r.source for r in ALL_RULES)
+    assert sum(r.source == "Design choice" for r in ALL_RULES) == 0
 
 
 # ---- environmental --------------------------------------------------------------------

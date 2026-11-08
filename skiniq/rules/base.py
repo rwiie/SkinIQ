@@ -38,6 +38,7 @@ class Rule:
     action: Action
     reason: Callable[[Product, USCE], str] | str
     weight: float = 0.0  # score adjustment: positive for PREFER, negative for CAUTION
+    source: str = "Design choice"  # citation from the proposal, the product dataset, or "Design choice"
 
     def explain(self, product: Product, usce: USCE) -> str:
         return self.reason(product, usce) if callable(self.reason) else self.reason

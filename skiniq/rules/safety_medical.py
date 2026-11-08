@@ -35,6 +35,7 @@ def _avoid_rule(option: str) -> Rule:
         applies=lambda u, o=option: o in u.avoid_ingredients,
         matches=lambda p, u, g=group: p.has(g),
         action=Action.EXCLUDE,
+        source="User preference (Appendix A, Q11)",
         reason=lambda p, u, o=option, g=group: (
             f"Contains {AVOID_LABELS[o]} ({ingredient_list(p, g)}), which you asked to avoid"),
     )
@@ -47,6 +48,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.pregnant,
         matches=lambda p, u: p.has("retinoid"),
         action=Action.EXCLUDE,
+         source="Bozzo et al. (2011); Kaplan et al. (2015)",
         reason=lambda p, u: f"Contains a retinoid ({ingredient_list(p, 'retinoid')}), not advised during pregnancy or breastfeeding",
     ),
     Rule(
@@ -55,6 +57,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.pregnant,
         matches=lambda p, u: p.has("hydroquinone"),
         action=Action.EXCLUDE,
+         source="Bozzo et al. (2011)",
         reason="Contains hydroquinone, not advised during pregnancy or breastfeeding",
     ),
     Rule(
@@ -63,6 +66,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.pregnant,
         matches=lambda p, u: p.has("bha"),
         action=Action.CAUTION, weight=-0.15,
+         source="Precaution (Bialas et al., 2023; Vinardell, 2015)",
         reason=lambda p, u: f"Contains {ingredient_list(p, 'bha')}; check with your doctor before using BHA during pregnancy",
     ),
     *[_avoid_rule(o) for o in AVOID_GROUPS],
@@ -72,6 +76,7 @@ RULES: list[Rule] = [
         applies=lambda u: bool(u.medical_conditions),
         matches=lambda p, u: p.has("fragrance") or p.has("essential_oil"),
         action=Action.EXCLUDE,
+         source="Hakulinen (2025); Schachner et al. (2023)",
         reason=lambda p, u: (
             "Contains fragrance or essential oils, a common trigger for "
             + ", ".join(c.replace("_", " ") for c in u.medical_conditions)),
@@ -83,6 +88,7 @@ RULES: list[Rule] = [
         matches=lambda p, u: ("rosacea" in u.medical_conditions and "Rosacea" in p.tags)
         or (any(c in u.medical_conditions for c in ECZEMA_LIKE) and "Eczema" in p.tags),
         action=Action.CAUTION, weight=-0.25,
+         source="Product dataset tags",
         reason="Contains ingredients flagged as possibly aggravating your skin condition",
     ),
     Rule(
@@ -91,6 +97,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.is_sensitive,
         matches=lambda p, u: "Irritating" in p.tags,
         action=Action.CAUTION, weight=-0.2,
+         source="Product dataset tags",
         reason="Contains ingredients flagged as potentially irritating for sensitive skin",
     ),
     Rule(
@@ -99,6 +106,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.is_sensitive and not u.medical_conditions,
         matches=lambda p, u: p.has("fragrance") or p.has("essential_oil") or p.has("drying_alcohol"),
         action=Action.CAUTION, weight=-0.15,
+         source="Hakulinen (2025); Schachner et al. (2023)",
         reason="Contains fragrance, essential oils or drying alcohol, which can irritate sensitive skin",
     ),
     Rule(
@@ -107,6 +115,7 @@ RULES: list[Rule] = [
         applies=lambda u: u.is_sensitive,
         matches=lambda p, u: "Reduces Irritation" in p.tags or p.has("centella") or p.has("ceramide"),
         action=Action.PREFER, weight=0.1,
+         source="Schachner et al. (2023); product dataset tags",
         reason="Contains soothing or barrier-repairing ingredients (e.g. centella, ceramides)",
     ),
 ]
