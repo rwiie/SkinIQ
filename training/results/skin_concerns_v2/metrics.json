@@ -1,0 +1,112 @@
+{
+  "run_name": "skin_concerns",
+  "model": "tf_efficientnetv2_s.in21k_ft_in1k",
+  "best_epoch": 9,
+  "epochs_run": 12,
+  "selected_by": "val mean ROC-AUC",
+  "train_files": 8274,
+  "train_files_fully_annotated": 680,
+  "test": {
+    "photos": 237,
+    "macro_f1": 0.6611,
+    "micro_f1": 0.6771,
+    "exact_match": 0.3586,
+    "hamming_loss": 0.1737,
+    "clear_photos": 29,
+    "clear_false_alarm_rate": 0.1724,
+    "multi_concern_photos": 121
+  },
+  "per_concern": {
+    "acne": {
+      "threshold": 0.55,
+      "precision": 0.7576,
+      "recall": 0.7895,
+      "f1": 0.7732,
+      "roc_auc": 0.8986,
+      "pr_auc": 0.8793,
+      "positives": 95,
+      "negatives": 142
+    },
+    "blackheads": {
+      "threshold": 0.15,
+      "precision": 0.5063,
+      "recall": 0.9302,
+      "f1": 0.6557,
+      "roc_auc": 0.9469,
+      "pr_auc": 0.8816,
+      "positives": 43,
+      "negatives": 194
+    },
+    "hyperpigmentation": {
+      "threshold": 0.35,
+      "precision": 0.7188,
+      "recall": 0.4792,
+      "f1": 0.575,
+      "roc_auc": 0.7955,
+      "pr_auc": 0.6711,
+      "positives": 48,
+      "negatives": 189
+    },
+    "redness": {
+      "threshold": 0.5,
+      "precision": 0.9259,
+      "recall": 0.4808,
+      "f1": 0.6329,
+      "roc_auc": 0.8025,
+      "pr_auc": 0.7078,
+      "positives": 52,
+      "negatives": 185
+    },
+    "enlarged_pores": {
+      "threshold": 0.55,
+      "precision": 0.6866,
+      "recall": 0.7077,
+      "f1": 0.697,
+      "roc_auc": 0.8707,
+      "pr_auc": 0.7452,
+      "positives": 65,
+      "negatives": 172
+    },
+    "wrinkles": {
+      "threshold": 0.25,
+      "precision": 0.6579,
+      "recall": 0.6098,
+      "f1": 0.6329,
+      "roc_auc": 0.7908,
+      "pr_auc": 0.7496,
+      "positives": 82,
+      "negatives": 155
+    }
+  },
+  "thresholds": {
+    "acne": 0.55,
+    "blackheads": 0.15,
+    "hyperpigmentation": 0.35,
+    "redness": 0.5,
+    "enlarged_pores": 0.55,
+    "wrinkles": 0.25
+  },
+  "settings": {
+    "labels": "/content/SkinIQ/data/labels/multilabel_labels.csv",
+    "data_dir": "/content/SkinIQ/data/processed",
+    "out_dir": "/content/drive/MyDrive/SkinIQ/models",
+    "run_name": "skin_concerns",
+    "model": "tf_efficientnetv2_s.in21k_ft_in1k",
+    "no_pretrained": "False",
+    "img_size": "224",
+    "epochs": "12",
+    "batch_size": "32",
+    "lr": "0.0002",
+    "weight_decay": "0.05",
+    "warmup_epochs": "1.0",
+    "freeze_epochs": "3",
+    "aug": "strong",
+    "drop_rate": "0.3",
+    "patience": "5",
+    "unknown_negative_weight": "0.1",
+    "min_val_photos": "50",
+    "include_unsure_in_test": "False",
+    "num_workers": "2",
+    "seed": "42"
+  }
+}
