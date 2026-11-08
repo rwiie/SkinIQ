@@ -119,3 +119,32 @@ def test_condition_scores_take_highest_region_and_locations_need_confidence():
     scores = analysis.condition_scores
     assert scores["blackheads"] == pytest.approx(0.9) and scores["acne"] == pytest.approx(0.7)
     assert analysis.locations == {"blackheads": ["nose"], "acne": ["left_cheek"]}  # chin 40%: not confident
+
+
+def test_multilabel_region_reports_every_concern_over_its_threshold():
+    th = {c: 0.5 for c in SKIN_CONDITIONS} | {"redness": 0.3}
+    p = {c: 0.1 for c in SKIN_CONDITIONS} | {"acne": 0.7, "redness": 0.35, "wrinkles": 0.45}
+    analysis = RegionAnalysis(True, [
+        RegionResult(WHOLE_FACE, (0, 0, 9, 9), p),
+        RegionResult("left_cheek", (0, 0, 9, 9), p),
+        RegionResult("forehead", (0, 0, 9, 9), {c: 0.1 for c in SKIN_CONDITIONS} | {"wrinkles": 0.8}),
+    ], thresholds=th)
+    assert analysis.locations == {"acne": ["left_cheek"], "redness": ["left_cheek"], "wrinkles": ["forehead"]}
+    img = analysis.to_image_analysis()
+    assert img.independent and img.conditions["wrinkles"] == pytest.approx(0.8)
+    assert img.locations["wrinkles"] == ["forehead"] and img.thresholds == th
+
+
+def test_clear_region_gets_no_location():
+    th = {c: 0.5 for c in SKIN_CONDITIONS}
+    analysis = RegionAnalysis(True, [RegionResult("nose", (0, 0, 9, 9), {c: 0.1 for c in SKIN_CONDITIONS})],
+                              thresholds=th)
+    assert analysis.locations == {}
+
+
+def test_analyse_regions_uses_multilabel_classifier_thresholds(monkeypatch):
+    monkeypatch.setattr(regions, "detect_face", lambda img: face_at())
+    clf = FakeClassifier({c: 0.1 for c in SKIN_CONDITIONS} | {"acne": 0.6, "blackheads": 0.6})
+    clf.multilabel, clf.thresholds = True, {c: 0.5 for c in SKIN_CONDITIONS}
+    result = analyse_regions(Image.new("RGB", (400, 500), SKIN), clf)
+    assert set(result.locations) == {"acne", "blackheads"}

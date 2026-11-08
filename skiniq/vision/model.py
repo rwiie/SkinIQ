@@ -88,6 +88,8 @@ class SkinClassifier:
     labels: list[str]
     image_size: int
     device: torch.device
+    multilabel: bool = False                  # sigmoid outputs (independent concerns)
+    thresholds: dict[str, float] | None = None  # per-concern decision thresholds (multi-label)
 
     @classmethod
     def load(cls, path: str | Path, device: str | None = None) -> "SkinClassifier":
@@ -96,11 +98,17 @@ class SkinClassifier:
         model = build_model(len(ckpt["labels"]), ckpt["model_name"], pretrained=False)
         model.load_state_dict(ckpt["state_dict"])
         model.to(dev).eval()
-        return cls(model=model, labels=ckpt["labels"], image_size=ckpt["image_size"], device=dev)
+        return cls(model=model, labels=ckpt["labels"], image_size=ckpt["image_size"], device=dev,
+                   multilabel=bool(ckpt.get("multilabel", False)), thresholds=ckpt.get("thresholds"))
 
     @torch.no_grad()
     def predict(self, image: Image.Image) -> dict[str, float]:
-        """Return {label: probability}, highest first."""
+        """Return {label: probability}, highest first.
+
+        Single-label models: probabilities sum to 1 (softmax). Multi-label models: each
+        concern has its own independent probability (sigmoid).
+        """
         x = eval_transform(self.image_size)(image.convert("RGB")).unsqueeze(0).to(self.device)
-        probs = self.model(x).softmax(dim=1)[0].tolist()
+        logits = self.model(x)[0]
+        probs = (logits.sigmoid() if self.multilabel else logits.softmax(dim=0)).tolist()
         return dict(sorted(zip(self.labels, probs), key=lambda kv: kv[1], reverse=True))

@@ -107,3 +107,19 @@ def test_frozen_epoch_does_not_change_backbone(tiny_dataset, tmp_path):
     assert not trained["state_dict"]["classifier.weight"].equal(init["classifier.weight"])
     metrics = json.loads((out / "frozen" / "metrics.json").read_text())
     assert metrics["run_name"] == "frozen" and metrics["settings"]["aug"] == "strong"
+
+
+def test_multilabel_checkpoint_gives_independent_probabilities(tmp_path):
+    from skiniq.config import SKIN_CONDITIONS
+    from skiniq.vision.model import build_model
+
+    model = build_model(6, "tf_efficientnetv2_b0", pretrained=False)
+    thresholds = {c: 0.4 for c in SKIN_CONDITIONS}
+    torch.save({"state_dict": model.state_dict(), "labels": list(SKIN_CONDITIONS),
+                "model_name": "tf_efficientnetv2_b0", "image_size": 32, "multilabel": True,
+                "thresholds": thresholds}, tmp_path / "ml.pt")
+    clf = SkinClassifier.load(tmp_path / "ml.pt", device="cpu")
+    assert clf.multilabel and clf.thresholds == thresholds
+    probs = clf.predict(Image.new("RGB", (64, 64), (200, 150, 120)))
+    assert all(0 < p < 1 for p in probs.values())
+    assert sum(probs.values()) != pytest.approx(1.0, abs=1e-3)  # sigmoid, not softmax

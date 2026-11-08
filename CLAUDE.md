@@ -10,6 +10,7 @@ See README.md for the pipeline, project layout and roadmap.
 - Knowledge-base rules: one module per knowledge base in `skiniq/rules/`. Every rule needs a pytest case in `tests/`, including edge-case user profiles (proposal 3.8).
 - Secrets (OpenWeatherMap key) come from `st.secrets` or the `OPENWEATHER_API_KEY` env var. Never hard-code or commit them.
 - Raw images and model weights are not committed (`data/raw/`, `models/` are gitignored).
+- Skin concerns: multi-label (sigmoid + BCE, per-concern thresholds). Skin type: questionnaire (`SKIN_TYPE_IMAGE_WEIGHT = 0`).
 - Run `pytest` before committing.
 
 ## Skills to use
@@ -17,7 +18,7 @@ See README.md for the pipeline, project layout and roadmap.
 | Work | Skill |
 |---|---|
 | Streamlit UI, caching, deployment | `developing-with-streamlit` |
-| Dataset prep, EfficientNet-V2 training (timm) | `huggingface-vision-trainer` |
+| Dataset prep, EfficientNet-V2 training (timm), multi-label training | `huggingface-vision-trainer` |
 | TF-IDF, cosine similarity, evaluation metrics, bias testing | `scikit-learn` |
 | Rule and pipeline tests | `python-testing-patterns` |
 | Any bug or failing test | `systematic-debugging` |

@@ -68,6 +68,15 @@ class RegionAnalysis:
     face_found: bool
     regions: list[RegionResult]
     aligned_image: Image.Image | None = field(default=None, repr=False)
+    thresholds: dict[str, float] | None = None  # set for multi-label models
+
+    def _found_in(self, r: RegionResult) -> list[str]:
+        """Concerns a region shows: every concern over its threshold (multi-label),
+        or the confident top prediction (single-label)."""
+        if self.thresholds is not None:
+            return [c for c in SKIN_CONDITIONS if r.probabilities[c] >= self.thresholds[c]]
+        c, p = r.top
+        return [c] if p >= CONDITION_DETECTED_THRESHOLD else []
 
     @property
     def condition_scores(self) -> dict[str, float]:
@@ -79,10 +88,18 @@ class RegionAnalysis:
         """Regions where each condition is the confident top prediction."""
         found: dict[str, list[str]] = {}
         for r in self.regions:
-            c, p = r.top
-            if p >= CONDITION_DETECTED_THRESHOLD and r.name not in (WHOLE_FACE, WHOLE_IMAGE):
+            if r.name in (WHOLE_FACE, WHOLE_IMAGE):
+                continue
+            for c in self._found_in(r):
                 found.setdefault(c, []).append(r.name)
         return found
+
+    def to_image_analysis(self):
+        """Region scores as fusion input (highest score per concern across regions)."""
+        from skiniq.fusion import ImageAnalysis
+
+        return ImageAnalysis(conditions=self.condition_scores, independent=True,
+                             thresholds=self.thresholds, locations=self.locations)
 
 
 # ---- face detection and alignment ------------------------------------------------------
@@ -182,10 +199,12 @@ def analyse_regions(image: Image.Image, classifier) -> RegionAnalysis:
     e.g. `skiniq.vision.model.SkinClassifier`.
     """
     image = image.convert("RGB")
+    thresholds = getattr(classifier, "thresholds", None) if getattr(classifier, "multilabel", False) else None
     face = detect_face(image)
     if face is None:
         full = (0, 0, image.width, image.height)
-        return RegionAnalysis(False, [RegionResult(WHOLE_IMAGE, full, classifier.predict(image))], image)
+        return RegionAnalysis(False, [RegionResult(WHOLE_IMAGE, full, classifier.predict(image))], image,
+                              thresholds)
 
     aligned, face = align_face(image, face)
     crops = {WHOLE_FACE: _pad_box(face.box, aligned.size), **region_boxes(face, aligned.size)}
@@ -195,7 +214,7 @@ def analyse_regions(image: Image.Image, classifier) -> RegionAnalysis:
         if name != WHOLE_FACE and skin_fraction(crop) < MIN_SKIN_FRACTION:
             continue
         results.append(RegionResult(name, box, classifier.predict(crop)))
-    return RegionAnalysis(True, results, aligned)
+    return RegionAnalysis(True, results, aligned, thresholds)
 
 
 def _pad_box(box: Box, size: tuple[int, int], pad: float = 0.1) -> Box:
@@ -210,9 +229,10 @@ def draw_regions(analysis: RegionAnalysis) -> Image.Image:
     for r in analysis.regions:
         if r.name in (WHOLE_FACE, WHOLE_IMAGE):
             continue
-        c, p = r.top
-        color = (220, 60, 60) if p >= CONDITION_DETECTED_THRESHOLD else (160, 160, 160)
+        found = analysis._found_in(r)
+        text = ", ".join(f"{c} {r.probabilities[c]:.0%}" for c in found) or "clear"
+        color = (220, 60, 60) if found else (60, 170, 90)
         cv2.rectangle(img, r.box[:2], r.box[2:], color, 2)
-        cv2.putText(img, f"{r.name}: {c} {p:.0%}", (r.box[0] + 3, r.box[1] + 14),
+        cv2.putText(img, f"{r.name}: {text}", (r.box[0] + 3, r.box[1] + 14),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, cv2.LINE_AA)
     return Image.fromarray(img)

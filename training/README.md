@@ -22,6 +22,32 @@ to retrain skin type with anti-overfitting settings (EfficientNet-V2-B0, lower l
 
 Result: 29.8% test accuracy (v1: 31.6%). See **Results** below for the decision.
 
+## Multi-label skin concern model (current approach)
+
+The single-label condition model picks one condition per image and has no "clear skin"
+option, so it can't report several concerns on one face and labels healthy skin as some
+condition. The multi-label model fixes both: **EfficientNet-V2 with six independent sigmoid
+outputs, trained with binary cross-entropy**, so a face can have any number of concerns,
+including none. **YuNet** face detection splits a face into forehead, nose, cheeks and chin.
+
+| Step | Notebook / script | Output |
+|---|---|---|
+| 1. Label photos (all six concerns) | [`annotate_colab.ipynb`](https://colab.research.google.com/github/rwiie/SkinIQ/blob/main/training/annotate_colab.ipynb), rules in [`docs/annotation_guidelines.md`](../docs/annotation_guidelines.md) | `My Drive/SkinIQ/labels/multilabel_labels.csv` |
+| 2. Train + evaluate per concern | [`train_multilabel_colab.ipynb`](https://colab.research.google.com/github/rwiie/SkinIQ/blob/main/training/train_multilabel_colab.ipynb) → `train_multilabel.py` | `models/skin_concerns/` |
+| 3. Whole image vs face regions | `evaluate_regions.py` (run by the same notebook) | `region_evaluation.csv` |
+
+- **Annotation:** one label set per original photo (6,079 photos; copies share labels), in the
+  priority order of `data/labels/annotation_queue.csv`: a stratified 300-photo test sample,
+  a 200-photo validation sample, then training photos. Minimum recommended: test + validation
+  + about 700 training photos (≈1,200 photos, ≈2 hours). Training photos matter: clear full
+  faces are the model's strongest "no concern" examples.
+- **Unlabelled close-ups still train the model:** their folder concern is a known positive;
+  their other five concerns are weak negatives (loss weight 0.1). Unlabelled full faces are skipped.
+- **Thresholds:** one per concern, chosen on validation photos to maximise F1.
+- **Metrics (test photos only, copies averaged per photo):** per concern precision, recall,
+  F1, ROC-AUC and PR-AUC; overall macro/micro F1, exact match, Hamming loss, and the
+  false-alarm rate on clear-skin photos.
+
 ## Run locally (GPU)
 
 ```bash

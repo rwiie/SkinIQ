@@ -54,15 +54,28 @@ MULTI_SELECT = ("known_conditions", "goals", "avoid_ingredients")
 
 @dataclass(frozen=True)
 class ImageAnalysis:
-    """CNN output for one facial image."""
+    """CNN output for one facial image.
+
+    `independent=True` for multi-label (sigmoid) or region-aggregated scores, which
+    don't sum to 1. `thresholds` are the model's per-concern decision thresholds;
+    `locations` lists the face regions where each concern was found.
+    """
 
     conditions: dict[str, float]               # probability per skin condition
     skin_type: dict[str, float] | None = None  # optional; ignored while SKIN_TYPE_IMAGE_WEIGHT is 0
+    independent: bool = False
+    thresholds: dict[str, float] | None = None
+    locations: dict[str, list[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        _check_distribution(self.conditions, SKIN_CONDITIONS, "conditions")
+        _check_distribution(self.conditions, SKIN_CONDITIONS, "conditions", must_sum_to_one=not self.independent)
         if self.skin_type is not None:
             _check_distribution(self.skin_type, SKIN_TYPES, "skin_type")
+        if self.thresholds is not None and set(self.thresholds) != set(SKIN_CONDITIONS):
+            raise ValueError("thresholds must cover every skin condition")
+
+    def threshold(self, condition: str) -> float:
+        return self.thresholds[condition] if self.thresholds else CONDITION_DETECTED_THRESHOLD
 
 
 @dataclass
@@ -73,6 +86,7 @@ class Concern:
     photo: float | None    # CNN probability (None if no photo)
     self_reported: float   # questionnaire evidence
     sources: list[str] = field(default_factory=list)
+    locations: list[str] = field(default_factory=list)  # face regions (region analysis only)
 
 
 @dataclass
@@ -198,13 +212,17 @@ def build_usce(
             sources.append("photo")
         if self_reported[c] >= CONDITION_POSSIBLE_THRESHOLD:
             sources.append("questionnaire")
+        # Photo uses the model's own threshold for this concern; self-report the default
+        photo_status = _status(photo, image.threshold(c)) if image else "none"
+        status = max(photo_status, _status(self_reported[c]), key=STATUS_RANK.index)
         concerns[c] = Concern(
             condition=c,
             score=round(score, 4),
-            status=_status(score),
+            status=status,
             photo=None if photo is None else round(photo, 4),
             self_reported=self_reported[c],
             sources=sources,
+            locations=list(image.locations.get(c, [])) if image else [],
         )
 
     # Sensitivity and safety
@@ -233,10 +251,13 @@ def build_usce(
 
 # ---- helpers ------------------------------------------------------------------------
 
-def _status(score: float) -> str:
-    if score >= CONDITION_DETECTED_THRESHOLD:
+STATUS_RANK = ("none", "possible", "detected")
+
+
+def _status(score: float, detected_at: float = CONDITION_DETECTED_THRESHOLD) -> str:
+    if score >= detected_at:
         return "detected"
-    if score >= CONDITION_POSSIBLE_THRESHOLD:
+    if score >= min(CONDITION_POSSIBLE_THRESHOLD, detected_at):
         return "possible"
     return "none"
 
@@ -245,12 +266,13 @@ def _clip01(x: float) -> float:
     return min(max(x, 0.0), 1.0)
 
 
-def _check_distribution(probs: dict[str, float], labels: tuple[str, ...], name: str) -> None:
+def _check_distribution(probs: dict[str, float], labels: tuple[str, ...], name: str,
+                        must_sum_to_one: bool = True) -> None:
     if set(probs) != set(labels):
         raise ValueError(f"{name} must have exactly {list(labels)}, got {sorted(probs)}")
     if any(not 0 <= p <= 1 for p in probs.values()):
         raise ValueError(f"{name} probabilities must be between 0 and 1")
-    if abs(sum(probs.values()) - 1) > 0.01:
+    if must_sum_to_one and abs(sum(probs.values()) - 1) > 0.01:
         raise ValueError(f"{name} probabilities must sum to 1, got {sum(probs.values()):.3f}")
 
 

@@ -182,3 +182,47 @@ def test_to_dict_is_json_serialisable(answers, image, kl_afternoon):
     assert restored["detected_conditions"] == ["acne"]
     assert restored["environment"]["uv_level"] == "very_high"
     assert list(restored["concerns"])[0] == "acne"  # highest concern first
+
+
+# ---- multi-label / region input -------------------------------------------------------
+
+def multi(**probs):
+    return {c: probs.get(c, 0.05) for c in SKIN_CONDITIONS}
+
+
+def test_independent_probabilities_need_not_sum_to_one(answers):
+    img = ImageAnalysis(conditions=multi(acne=0.9, blackheads=0.8, hyperpigmentation=0.7), independent=True)
+    usce = build_usce(answers(), img)
+    assert usce.detected_conditions == ["acne", "blackheads", "hyperpigmentation"]
+
+
+def test_single_label_input_still_must_sum_to_one():
+    with pytest.raises(ValueError, match="sum to 1"):
+        ImageAnalysis(conditions=multi(acne=0.9, blackheads=0.8))
+
+
+def test_per_concern_threshold_decides_photo_detection(answers):
+    thresholds = {c: 0.5 for c in SKIN_CONDITIONS} | {"redness": 0.3, "acne": 0.8}
+    img = ImageAnalysis(conditions=multi(redness=0.35, acne=0.6), independent=True, thresholds=thresholds)
+    usce = build_usce(answers(), img)
+    assert usce.concerns["redness"].status == "detected"   # 0.35 >= its tuned 0.3
+    assert usce.concerns["acne"].status == "possible"      # 0.6 < its tuned 0.8
+
+
+def test_self_report_still_detects_when_photo_threshold_is_high(answers):
+    thresholds = {c: 0.9 for c in SKIN_CONDITIONS}
+    img = ImageAnalysis(conditions=multi(acne=0.6), independent=True, thresholds=thresholds)
+    assert build_usce(answers(breakouts="frequently"), img).concerns["acne"].status == "detected"
+
+
+def test_thresholds_must_cover_every_concern():
+    with pytest.raises(ValueError, match="thresholds"):
+        ImageAnalysis(conditions=multi(), independent=True, thresholds={"acne": 0.5})
+
+
+def test_locations_reach_the_concern(answers):
+    img = ImageAnalysis(conditions=multi(blackheads=0.9), independent=True,
+                        locations={"blackheads": ["nose", "chin"]})
+    usce = build_usce(answers(), img)
+    assert usce.concerns["blackheads"].locations == ["nose", "chin"]
+    assert usce.to_dict()["concerns"]["blackheads"]["locations"] == ["nose", "chin"]
