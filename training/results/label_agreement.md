@@ -7,8 +7,10 @@
 | 22 (test sample) | Human (project author) | Colab labelling tool, `docs/annotation_guidelines.md` |
 | 478 (rest of the 300 test + 200 validation sample) | AI vision assistant (Claude) | Viewed each photo on numbered contact sheets (`training/label_sheets.py`), six concerns per photo, same written guidelines. Close-ups and Roboflow photos started from their known concern(s); other concerns were added or removed by inspection |
 
-All 500 photos are in `data/labels/multilabel_labels.csv` (`annotator` column: `raneem` or `claude`).
-106 photos are flagged `unsure` (blurry, small, filtered or heavily made-up) and are left out of the test metrics by default.
+| 405 (training, full-face selfies from the skin type dataset) | AI vision assistant (Claude) | Same method, nine photos per sheet. 242 have no concerns (clear skin); 110 are flagged unsure and 30 unusable |
+
+All 905 photos are in `data/labels/multilabel_labels.csv` (`annotator` column: `raneem` or `claude`).
+In test and validation, 106 photos are flagged `unsure` (blurry, small, filtered or heavily made-up) and are left out of the test metrics by default. Unsure training photos are left out of training.
 
 ## Agreement check (pilot, before the AI labels were made)
 

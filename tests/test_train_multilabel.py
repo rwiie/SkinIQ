@@ -197,3 +197,15 @@ def test_region_evaluation_compares_whole_and_region(tmp_path, monkeypatch):
     assert report["full faces"]["region"]["overall"]["clear_false_alarm_rate"] == 1.0  # acne on the clear face
     assert report["close-ups"]["whole"]["per_concern"]["redness"]["recall"] == 0.0
     assert len(ev.summary_table(report)) == 6
+
+
+def test_unsure_training_photos_are_skipped_but_unsure_test_photos_kept(tmp_path):
+    write_dataset(tmp_path, "skin_condition", [(0, "train", "acne")])
+    write_dataset(tmp_path, "skin_type", [(0, "train", "oily"), (1, "train", "dry"), (2, "test", "normal")])
+    pd.DataFrame([
+        label_row("skin_type:0", "train", [], unsure=1),
+        label_row("skin_type:1", "train", []),
+        label_row("skin_type:2", "test", [], unsure=1),
+    ]).to_csv(tmp_path / "labels.csv", index=False)
+    keys = set(tm.build_table(tmp_path, tmp_path / "labels.csv").key)
+    assert "skin_type:0" not in keys and {"skin_type:1", "skin_type:2"} <= keys

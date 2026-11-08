@@ -67,8 +67,8 @@ def build_table(processed: Path, labels_csv: Path | None, unknown_negative_weigh
                    "annotated": False, "unsure": False}
             if key in labels.index:
                 lab = labels.loc[key]
-                if int(lab["unusable"]):
-                    continue
+                if int(lab["unusable"]) or (int(lab["unsure"]) and r.split == "train"):
+                    continue  # unsure labels may be wrong: kept for evaluation only
                 row.update({f"y_{c}": float(lab[c]) for c in C})
                 row.update({f"m_{c}": 1.0 for c in C})
                 row.update(annotated=True, unsure=bool(int(lab["unsure"])))
@@ -88,8 +88,8 @@ def build_table(processed: Path, labels_csv: Path | None, unknown_negative_weigh
                    "annotated": False, "unsure": False}
             if key in labels.index:
                 lab = labels.loc[key]
-                if int(lab["unusable"]):
-                    continue
+                if int(lab["unusable"]) or (int(lab["unsure"]) and r.split == "train"):
+                    continue  # unsure labels may be wrong: kept for evaluation only
                 row.update({f"y_{c}": float(lab[c]) for c in C})
                 row.update({f"m_{c}": 1.0 for c in C})
                 row.update(annotated=True, unsure=bool(int(lab["unsure"])))
