@@ -30,6 +30,10 @@ condition. The multi-label model fixes both: **EfficientNet-V2 with six independ
 outputs, trained with binary cross-entropy**, so a face can have any number of concerns,
 including none. **YuNet** face detection splits a face into forehead, nose, cheeks and chin.
 
+Data: the two Kaggle datasets plus the Roboflow *Skin Problem Detection* dataset (CC BY 4.0),
+whose bounding boxes are converted to six image-level labels by `prepare_roboflow.py`
+(report: `data_report_roboflow.md`). Images are resized to 224 × 224 and ImageNet-normalised.
+
 | Step | Notebook / script | Output |
 |---|---|---|
 | 1. Label photos (all six concerns) | [`annotate_colab.ipynb`](https://colab.research.google.com/github/rwiie/SkinIQ/blob/main/training/annotate_colab.ipynb), rules in [`docs/annotation_guidelines.md`](../docs/annotation_guidelines.md) | `My Drive/SkinIQ/labels/multilabel_labels.csv` |
@@ -37,12 +41,13 @@ including none. **YuNet** face detection splits a face into forehead, nose, chee
 | 3. Whole image vs face regions | `evaluate_regions.py` (run by the same notebook) | `region_evaluation.csv` |
 
 - **Annotation:** one label set per original photo (6,079 photos; copies share labels), in the
-  priority order of `data/labels/annotation_queue.csv`: a stratified 300-photo test sample,
-  a 200-photo validation sample, then training photos. Minimum recommended: test + validation
-  + about 700 training photos (≈1,200 photos, ≈2 hours). Training photos matter: clear full
-  faces are the model's strongest "no concern" examples.
-- **Unlabelled close-ups still train the model:** their folder concern is a known positive;
-  their other five concerns are weak negatives (loss weight 0.1). Unlabelled full faces are skipped.
+  priority order of `data/labels/annotation_queue.csv` (8,094 photos): a stratified 300-photo
+  test sample (100 each from full faces, close-ups and Roboflow), a 200-photo validation sample,
+  then training photos. Minimum: the 500 test + validation photos (≈1 hour). Training labels
+  are optional but help, especially clear full faces (the strongest "no concern" examples).
+- **Unlabelled close-ups and Roboflow images still train the model:** their folder concern or
+  boxed concerns are known positives; their other concerns are weak negatives (loss weight 0.1).
+  Unlabelled full faces are skipped.
 - **Thresholds:** one per concern, chosen on validation photos to maximise F1.
 - **Metrics (test photos only, copies averaged per photo):** per concern precision, recall,
   F1, ROC-AUC and PR-AUC; overall macro/micro F1, exact match, Hamming loss, and the

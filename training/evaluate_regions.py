@@ -51,7 +51,8 @@ def evaluate(classifier, labels: pd.DataFrame, image_root: Path, include_unsure:
 
     report = {}
     for subset, part in [("all", df), ("full faces", df[df.dataset == "skin_type"]),
-                         ("close-ups", df[df.dataset == "skin_condition"])]:
+                         ("close-ups", df[df.dataset == "skin_condition"]),
+                         ("roboflow", df[df.dataset == "skin_problem"])]:
         if part.empty:
             continue
         y = part[[f"y_{c}" for c in C]].values.astype(int)
@@ -62,8 +63,9 @@ def evaluate(classifier, labels: pd.DataFrame, image_root: Path, include_unsure:
                 "overall": overall_metrics(p, y, th),
                 "per_concern": per_concern_metrics(p, y, th).to_dict(orient="index"),
             }
-    report["faces_found"] = {"full faces": int(df[df.dataset == "skin_type"].face_found.sum()),
-                             "close-ups": int(df[df.dataset == "skin_condition"].face_found.sum())}
+    report["faces_found"] = {name: int(df[df.dataset == ds].face_found.sum())
+                             for name, ds in (("full faces", "skin_type"), ("close-ups", "skin_condition"),
+                                              ("roboflow", "skin_problem"))}
     return report
 
 

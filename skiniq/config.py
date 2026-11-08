@@ -21,6 +21,7 @@ SKIN_CONDITIONS: tuple[str, ...] = (
 DATA_SPLIT = {"train": 0.70, "val": 0.15, "test": 0.15}
 
 IMAGE_SIZE = 300  # EfficientNet-V2-S training resolution (fits a free Colab T4)
+MULTILABEL_IMAGE_SIZE = 224  # multi-label skin concern model input (224 x 224)
 
 
 def openweather_api_key() -> str | None:

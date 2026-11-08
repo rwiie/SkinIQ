@@ -1,8 +1,10 @@
 """Multi-label skin concern training: EfficientNet-V2 with six independent sigmoid outputs
 and binary cross-entropy, evaluated per concern.
 
-Labels come from two sources:
+Labels come from these sources:
 - Annotated photos (data/labels/multilabel_labels.csv): all six concerns known.
+- Roboflow skin problem images (training/prepare_roboflow.py): concerns with a box
+  are known positives; concerns without a box are weak negatives (see below).
 - Unannotated close-ups: only their dataset folder concern is known (positive).
   The other five are unknown. They are treated as *weak* negatives: target 0 with a
   small loss weight (--unknown-negative-weight, default 0.1), because most close-ups
@@ -39,7 +41,7 @@ from torch.utils.data import DataLoader, Dataset
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from skiniq.config import DATA_DIR, IMAGE_SIZE, MODELS_DIR, SKIN_CONDITIONS  # noqa: E402
+from skiniq.config import DATA_DIR, MODELS_DIR, MULTILABEL_IMAGE_SIZE, SKIN_CONDITIONS  # noqa: E402
 from skiniq.vision.model import DEFAULT_MODEL, build_model, eval_transform, train_transform  # noqa: E402
 from train import make_scheduler, seed_everything, set_backbone_trainable  # noqa: E402
 
@@ -76,6 +78,25 @@ def build_table(processed: Path, labels_csv: Path | None, unknown_negative_weigh
                 row.update({f"m_{c}": 1.0 if c in known else unknown_negative_weight for c in C})
             else:
                 continue  # unannotated full face: nothing known
+            rows.append(row)
+
+    roboflow = processed / "skin_problem" / "manifest.csv"
+    if roboflow.exists():
+        for r in pd.read_csv(roboflow).itertuples():
+            key = f"skin_problem:{r.group}"
+            row = {"path": str(processed / r.path), "split": r.split, "key": key, "dataset": "skin_problem",
+                   "annotated": False, "unsure": False}
+            if key in labels.index:
+                lab = labels.loc[key]
+                if int(lab["unusable"]):
+                    continue
+                row.update({f"y_{c}": float(lab[c]) for c in C})
+                row.update({f"m_{c}": 1.0 for c in C})
+                row.update(annotated=True, unsure=bool(int(lab["unsure"])))
+            else:
+                boxed = set(r.concerns.split("|"))
+                row.update({f"y_{c}": float(c in boxed) for c in C})
+                row.update({f"m_{c}": 1.0 if c in boxed else unknown_negative_weight for c in C})
             rows.append(row)
     return pd.DataFrame(rows)
 
@@ -194,7 +215,7 @@ def parse_args(argv=None):
     p.add_argument("--run-name", default="skin_concerns")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--no-pretrained", action="store_true")
-    p.add_argument("--img-size", type=int, default=IMAGE_SIZE)
+    p.add_argument("--img-size", type=int, default=MULTILABEL_IMAGE_SIZE)
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--lr", type=float, default=3e-4)

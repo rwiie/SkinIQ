@@ -5,8 +5,9 @@ representative file per photo group is annotated. The queue starts with a strati
 test sample, then a validation sample, then training photos, so annotation can stop
 at any point and still leave a fully labelled test set.
 
-Close-ups from the skin condition dataset start with their folder label(s) ticked;
-full faces from the skin type dataset start with nothing ticked.
+Close-ups from the skin condition dataset start with their folder label(s) ticked,
+Roboflow images with their boxed concerns ticked; full faces from the skin type
+dataset start with nothing ticked.
 
     python training/annotation_queue.py      # -> data/labels/annotation_queue.csv
 """
@@ -24,11 +25,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from skiniq.config import DATA_DIR, SKIN_CONDITIONS  # noqa: E402
 
+DATASETS = ("skin_type", "skin_condition", "skin_problem")
 PRIORITY_SAMPLE = {  # (split, dataset) -> number of photos annotated first
-    ("test", "skin_type"): 150,
-    ("test", "skin_condition"): 150,
-    ("val", "skin_type"): 100,
-    ("val", "skin_condition"): 100,
+    ("test", "skin_type"): 100,
+    ("test", "skin_condition"): 100,
+    ("test", "skin_problem"): 100,
+    ("val", "skin_type"): 67,
+    ("val", "skin_condition"): 67,
+    ("val", "skin_problem"): 66,
 }
 TIERS = ["test sample", "val sample", "train", "test rest", "val rest"]
 
@@ -52,6 +56,17 @@ def load_groups(processed: Path) -> pd.DataFrame:
                 "image": rep["path"],
                 "md5": rep["md5"],
                 "copies": len(g),
+            })
+    roboflow = processed / "skin_problem" / "manifest.csv"
+    if roboflow.exists():
+        m = pd.read_csv(roboflow)
+        for group, g in m.groupby("group"):
+            rep = g.sort_values("path").iloc[0]
+            concerns = sorted(set("|".join(g["concerns"]).split("|")))
+            rows.append({
+                "key": f"skin_problem:{group}", "dataset": "skin_problem", "group": group, "split": rep["split"],
+                "folder_labels": "|".join(concerns), "prefill": "|".join(concerns),
+                "image": rep["path"], "md5": rep["md5"], "copies": len(g),
             })
     return pd.DataFrame(rows)
 
@@ -80,8 +95,8 @@ def build_queue(groups: pd.DataFrame, seed: int = 42) -> pd.DataFrame:
     tier_of: dict[str, str] = {}
     for split in ("test", "val"):
         sampled = [
-            _stratified(groups[(groups.split == split) & (groups.dataset == ds)], PRIORITY_SAMPLE[(split, ds)], rng)
-            for ds in ("skin_type", "skin_condition")
+            _stratified(groups[(groups.split == split) & (groups.dataset == ds)], PRIORITY_SAMPLE.get((split, ds), 0), rng)
+            for ds in DATASETS
         ]
         for k in _interleave(*sampled):
             order.append(k)
@@ -91,7 +106,7 @@ def build_queue(groups: pd.DataFrame, seed: int = 42) -> pd.DataFrame:
         rest = [
             _stratified(groups[(groups.split == split) & (groups.dataset == ds) & ~groups.key.isin(chosen)],
                         len(groups), rng)
-            for ds in ("skin_type", "skin_condition")
+            for ds in DATASETS
         ]
         for k in _interleave(*rest):
             order.append(k)

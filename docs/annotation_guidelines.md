@@ -9,8 +9,10 @@ the labels are consistent.
 1. **Tick a concern if it is clearly visible anywhere on the skin in the photo.** Severity
    doesn't matter: one clear lesion is enough.
 2. **Don't tick what you can't see clearly.** If you'd have to guess, leave it unticked.
-3. **Close-ups start with their dataset folder's concern ticked.** Keep it if you can see it;
-   untick it only if it's clearly not there. Then add any other concerns you see.
+3. **Close-ups start with their dataset folder's concern ticked, and Roboflow photos with
+   the concerns their annotators boxed.** Keep a ticked concern if you can see it; untick it
+   only if it's clearly not there. Then add any other concerns you see: the Roboflow
+   annotators often labelled only one or two concerns per photo.
 4. **Tick "Unsure"** when the photo is too blurry, small, dark, filtered or heavily made-up
    to judge some concern. The labels are still saved; unsure photos can be left out of the
    test set.
