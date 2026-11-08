@@ -74,7 +74,7 @@ pytest
 1. Project setup ✅
 2. Data preparation (3.5) ✅
 3. Model training (3.6.1) ✅ skin condition 93.1% test accuracy; skin type 31.6% (v1) / 29.8% (v2), so skin type comes from the questionnaire (see `training/README.md`)
-4. USCE fusion layer (3.6.2)
+4. USCE fusion layer (3.6.2) ✅ see `docs/usce.md`
 5. Knowledge-base rules (3.6.3)
 6. TF-IDF recommendation ranking (3.6.4)
 7. Explanations + pipeline integration (3.6.5)

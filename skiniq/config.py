@@ -36,3 +36,18 @@ def openweather_api_key() -> str | None:
 # (v1 EfficientNet-V2-S 31.6%, v2 EfficientNet-V2-B0 with anti-overfitting settings 29.8%;
 # chance is 25%). See training/results/ and training/README.md.
 SKIN_TYPE_IMAGE_WEIGHT = 0.0
+
+# --- Fusion (USCE, proposal 3.6.2) -------------------------------------------------
+# The condition model has no "clear skin" class, so it always ranks some condition
+# first. A condition is only "detected" when the model is confident.
+CONDITION_DETECTED_THRESHOLD = 0.50
+CONDITION_POSSIBLE_THRESHOLD = 0.20
+
+# Environmental thresholds. UV categories follow the WHO UV Index
+# (0-2 low, 3-5 moderate, 6-7 high, 8-10 very high, 11+ extreme).
+UV_MODERATE = 3.0
+UV_HIGH = 6.0
+HUMID_PCT = 70.0      # humid air: lighter textures, oil control
+DRY_AIR_PCT = 40.0    # dry air: extra hydration and barrier care
+HOT_C = 30.0
+COLD_C = 18.0
