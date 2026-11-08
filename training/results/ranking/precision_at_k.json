@@ -1,0 +1,83 @@
+[
+  {
+    "profile": "acne",
+    "relevant tags": "Acne Fighting",
+    "base rate": 0.426,
+    "precision@5": 1.0,
+    "precision@10": 1.0,
+    "precision@20": 0.95,
+    "lift@10": 2.35
+  },
+  {
+    "profile": "hyperpigmentation",
+    "relevant tags": "Brightening, Dark Spots",
+    "base rate": 0.703,
+    "precision@5": 1.0,
+    "precision@10": 1.0,
+    "precision@20": 1.0,
+    "lift@10": 1.42
+  },
+  {
+    "profile": "redness",
+    "relevant tags": "Redness Reducing",
+    "base rate": 0.657,
+    "precision@5": 0.8,
+    "precision@10": 0.8,
+    "precision@20": 0.85,
+    "lift@10": 1.22
+  },
+  {
+    "profile": "wrinkles",
+    "relevant tags": "Anti-Aging",
+    "base rate": 0.541,
+    "precision@5": 0.4,
+    "precision@10": 0.6,
+    "precision@20": 0.75,
+    "lift@10": 1.11
+  },
+  {
+    "profile": "enlarged pores",
+    "relevant tags": "Reduces Large Pores",
+    "base rate": 0.176,
+    "precision@5": 1.0,
+    "precision@10": 0.7,
+    "precision@20": 0.65,
+    "lift@10": 3.98
+  },
+  {
+    "profile": "blackheads",
+    "relevant tags": "Reduces Large Pores",
+    "base rate": 0.176,
+    "precision@5": 1.0,
+    "precision@10": 1.0,
+    "precision@20": 0.85,
+    "lift@10": 5.68
+  },
+  {
+    "profile": "dry skin",
+    "relevant tags": "Hydrating",
+    "base rate": 0.149,
+    "precision@5": 0.2,
+    "precision@10": 0.1,
+    "precision@20": 0.1,
+    "lift@10": 0.67
+  },
+  {
+    "profile": "oily skin",
+    "relevant tags": "Good For Oily Skin",
+    "base rate": 0.55,
+    "precision@5": 1.0,
+    "precision@10": 1.0,
+    "precision@20": 1.0,
+    "lift@10": 1.82
+  },
+  {
+    "profile": "mean",
+    "relevant tags": "",
+    "base rate": 0.422,
+    "precision@5": 0.8,
+    "precision@10": 0.775,
+    "precision@20": 0.769,
+    "lift@10": 2.281
+  }
+]

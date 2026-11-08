@@ -78,7 +78,7 @@ pytest
    - Multi-label skin concerns (6 sigmoid outputs + YuNet regions): labelling in progress, see `training/README.md`
 4. USCE fusion layer (3.6.2) ✅ see `docs/usce.md`
 5. Knowledge-base rules (3.6.3) ✅ 34 rules in 4 knowledge bases, see `docs/rules.md`
-6. TF-IDF recommendation ranking (3.6.4)
+6. TF-IDF recommendation ranking (3.6.4) ✅ see `docs/ranking.md`
 7. Explanations + pipeline integration (3.6.5)
 8. Streamlit prototype (3.7)
 9. Debugging and code review
