@@ -123,3 +123,16 @@ def test_multilabel_checkpoint_gives_independent_probabilities(tmp_path):
     probs = clf.predict(Image.new("RGB", (64, 64), (200, 150, 120)))
     assert all(0 < p < 1 for p in probs.values())
     assert sum(probs.values()) != pytest.approx(1.0, abs=1e-3)  # sigmoid, not softmax
+
+
+@pytest.mark.parametrize("notebook", sorted((ROOT / "training").glob("*.ipynb")), ids=lambda p: p.name)
+def test_notebook_code_cells_are_valid_python(notebook):
+    """Colab cells (including !shell and %magic lines) must at least parse."""
+    transformer = pytest.importorskip("IPython.core.inputtransformer2").TransformerManager()
+    nb = json.loads(notebook.read_text())
+    for i, cell in enumerate(nb["cells"]):
+        if cell["cell_type"] != "code":
+            continue
+        src = "".join(cell["source"])
+        assert not any(line.rstrip().endswith("\\\\") for line in src.splitlines()), f"cell {i}: broken line continuation"
+        compile(transformer.transform_cell(src), f"{notebook.name}[{i}]", "exec")
