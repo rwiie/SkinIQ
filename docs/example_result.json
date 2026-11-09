@@ -1,0 +1,569 @@
+{
+  "input": {
+    "answers": {
+      "age_group": "18_24",
+      "pregnant": "no",
+      "known_conditions": [
+        "none"
+      ],
+      "sensitivity": "slightly",
+      "reacts_to_products": "sometimes",
+      "tightness": "sometimes",
+      "oiliness": "slightly_oily",
+      "oil_location": "t_zone",
+      "flakiness": "sometimes",
+      "breakouts": "frequently",
+      "goals": [
+        "acne_control",
+        "oil_control"
+      ],
+      "avoid_ingredients": [
+        "fragrance"
+      ]
+    },
+    "photo": "acne close-up from the test set",
+    "weather": {
+      "location": "Shah Alam",
+      "temperature_c": 32,
+      "humidity_pct": 78,
+      "uv_index": 10
+    }
+  },
+  "result": {
+    "skin_analysis": {
+      "skin_type": "combination",
+      "skin_type_text": "Your skin type is combination, based on your answers.",
+      "skin_type_reasons": [
+        "Where does your skin get oily or shiny? — Only my forehead, nose and chin (T-zone)",
+        "How oily does your skin become throughout the day? — Slightly oily",
+        "After washing your face, does your skin feel tight or dry? — Sometimes"
+      ],
+      "concerns": [
+        {
+          "concern": "acne",
+          "label": "acne",
+          "status": "detected",
+          "confidence": 0.9982,
+          "text": "Detected: acne, based on photo analysis 100% and your questionnaire answers."
+        }
+      ],
+      "no_concerns_text": null,
+      "sensitive": false,
+      "environment_text": "Weather in Shah Alam: 32 °C, 78% humidity, UV index 10 (very high).",
+      "photo_used": true
+    },
+    "advice": [
+      "The UV index is 10: apply sunscreen every morning and reapply every 2 hours outdoors.",
+      "Hot, humid weather: choose light gel or lotion textures and cleanse gently twice a day.",
+      "Acne: avoid picking, change pillowcases often, and give a new routine 6–8 weeks.",
+      "Oily areas still need moisturizer: skipping it can increase oil production."
+    ],
+    "routine": {
+      "morning": [
+        {
+          "step": "cleanser",
+          "label": "Cleanser",
+          "product": {
+            "product": "Some By Mi AHA, BHA, PHA, Calming Truecica Micellar Cleansing Water",
+            "brand": "Some By Mi",
+            "name": "AHA, BHA, PHA, Calming Truecica Micellar Cleansing Water",
+            "category": "Face Cleanser",
+            "step": "cleanser",
+            "score": 0.6026,
+            "match": 0.3276,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Capryloyl Salicylic Acid.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Capryloyl Salicylic Acid: fights acne — helps with acne",
+              "Asiaticoside: calms inflammation — helps with acne"
+            ],
+            "why": [
+              "Helps fight acne (Capryloyl Salicylic Acid, Salicylic Acid)",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Mixsoon H.C.T Bubble Cleanser",
+              "score": 0.5685
+            },
+            {
+              "product": "Dr. Jart+ Teatreement™ Cleansing Foam",
+              "score": 0.5665
+            }
+          ]
+        },
+        {
+          "step": "toner",
+          "label": "Toner",
+          "product": {
+            "product": "Some By Mi Yuja Niacin Brightening Toner",
+            "brand": "Some By Mi",
+            "name": "Yuja Niacin Brightening Toner",
+            "category": "Toner",
+            "step": "toner",
+            "score": 0.5952,
+            "match": 0.3202,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Glycerin.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Glycerin: hydrates",
+              "Panthenol: hydrates"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Dr.Ceuracle Tea Tree Purifine 70 Toner",
+              "score": 0.6689
+            },
+            {
+              "product": "innisfree Green Tea Balancing Toner",
+              "score": 0.6476
+            }
+          ]
+        },
+        {
+          "step": "treatment",
+          "label": "Serum / treatment",
+          "product": {
+            "product": "COSRX The Niacinamide 15 Serum",
+            "brand": "COSRX",
+            "name": "The Niacinamide 15 Serum",
+            "category": "Serum",
+            "step": "treatment",
+            "score": 0.7807,
+            "match": 0.5057,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Zinc PCA.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Zinc PCA: controls oil, fights acne — helps with acne, oiliness",
+              "Trehalose: hydrates"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Cos De BAHA Niacinamide 10% Serum",
+              "score": 0.7335
+            },
+            {
+              "product": "Cos De BAHA Niacinamide 20% + Zinc 4% Serum",
+              "score": 0.7121
+            }
+          ]
+        },
+        {
+          "step": "moisturizer",
+          "label": "Moisturizer",
+          "product": {
+            "product": "Dr. Jart+ Cicapair Tiger Grass Calming Gel Cream",
+            "brand": "Dr. Jart+",
+            "name": "Cicapair Tiger Grass Calming Gel Cream",
+            "category": "General Moisturizer",
+            "step": "moisturizer",
+            "score": 0.5572,
+            "match": 0.2822,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Glycerin.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Glycerin: hydrates",
+              "Madecassoside: calms inflammation — helps with acne"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "COSRX AC Collection Lightweight Soothing Moisturizer",
+              "score": 0.6233
+            },
+            {
+              "product": "Some By Mi Aha Bha Pha Real Cica 92% Cool Calming Soothing Gel",
+              "score": 0.5781
+            }
+          ]
+        },
+        {
+          "step": "sunscreen",
+          "label": "Sunscreen",
+          "product": {
+            "product": "Dr.Ceuracle Cica Regen Anti Dust Sun Gel",
+            "brand": "Dr.Ceuracle",
+            "name": "Cica Regen Anti Dust Sun Gel",
+            "category": "Sunscreen",
+            "step": "sunscreen",
+            "score": 0.9173,
+            "match": 0.4923,
+            "rule_score": 0.85,
+            "summary": "Chosen for your acne, oiliness, sun damage, mainly thanks to Niacinamide, Diethylamino Hydroxybenzoyl Hexyl Benzoate.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Diethylamino Hydroxybenzoyl Hexyl Benzoate: UV protection — helps with sun damage",
+              "Centella Asiatica Extract: calms inflammation — helps with acne"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "UV index is 10 (very high): daily sunscreen is essential",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Dr.Ceuracle Pro Balance Toning Sun Cream SPF 50+ PA++++",
+              "score": 0.9142
+            },
+            {
+              "product": "Beauty of Joseon Relief Sun : Rice + Probiotics",
+              "score": 0.9088
+            }
+          ]
+        }
+      ],
+      "evening": [
+        {
+          "step": "cleanser",
+          "label": "Cleanser",
+          "product": {
+            "product": "Some By Mi AHA, BHA, PHA, Calming Truecica Micellar Cleansing Water",
+            "brand": "Some By Mi",
+            "name": "AHA, BHA, PHA, Calming Truecica Micellar Cleansing Water",
+            "category": "Face Cleanser",
+            "step": "cleanser",
+            "score": 0.6026,
+            "match": 0.3276,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Capryloyl Salicylic Acid.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Capryloyl Salicylic Acid: fights acne — helps with acne",
+              "Asiaticoside: calms inflammation — helps with acne"
+            ],
+            "why": [
+              "Helps fight acne (Capryloyl Salicylic Acid, Salicylic Acid)",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Mixsoon H.C.T Bubble Cleanser",
+              "score": 0.5685
+            },
+            {
+              "product": "Dr. Jart+ Teatreement™ Cleansing Foam",
+              "score": 0.5665
+            }
+          ]
+        },
+        {
+          "step": "toner",
+          "label": "Toner",
+          "product": {
+            "product": "Some By Mi Yuja Niacin Brightening Toner",
+            "brand": "Some By Mi",
+            "name": "Yuja Niacin Brightening Toner",
+            "category": "Toner",
+            "step": "toner",
+            "score": 0.5952,
+            "match": 0.3202,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Glycerin.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Glycerin: hydrates",
+              "Panthenol: hydrates"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Dr.Ceuracle Tea Tree Purifine 70 Toner",
+              "score": 0.6689
+            },
+            {
+              "product": "innisfree Green Tea Balancing Toner",
+              "score": 0.6476
+            }
+          ]
+        },
+        {
+          "step": "treatment",
+          "label": "Serum / treatment",
+          "product": {
+            "product": "COSRX The Niacinamide 15 Serum",
+            "brand": "COSRX",
+            "name": "The Niacinamide 15 Serum",
+            "category": "Serum",
+            "step": "treatment",
+            "score": 0.7807,
+            "match": 0.5057,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Zinc PCA.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Zinc PCA: controls oil, fights acne — helps with acne, oiliness",
+              "Trehalose: hydrates"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "Cos De BAHA Niacinamide 10% Serum",
+              "score": 0.7335
+            },
+            {
+              "product": "Cos De BAHA Niacinamide 20% + Zinc 4% Serum",
+              "score": 0.7121
+            }
+          ]
+        },
+        {
+          "step": "moisturizer",
+          "label": "Moisturizer",
+          "product": {
+            "product": "Dr. Jart+ Cicapair Tiger Grass Calming Gel Cream",
+            "brand": "Dr. Jart+",
+            "name": "Cicapair Tiger Grass Calming Gel Cream",
+            "category": "General Moisturizer",
+            "step": "moisturizer",
+            "score": 0.5572,
+            "match": 0.2822,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Glycerin.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Glycerin: hydrates",
+              "Madecassoside: calms inflammation — helps with acne"
+            ],
+            "why": [
+              "Helps fight acne",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          },
+          "alternatives": [
+            {
+              "product": "COSRX AC Collection Lightweight Soothing Moisturizer",
+              "score": 0.6233
+            },
+            {
+              "product": "Some By Mi Aha Bha Pha Real Cica 92% Cool Calming Soothing Gel",
+              "score": 0.5781
+            }
+          ]
+        }
+      ],
+      "weekly": [
+        {
+          "step": "mask",
+          "label": "Mask",
+          "how_often": "1–3 times a week",
+          "product": {
+            "product": "Dr. Jart+ Dermask Micro Jet Clearing Solution",
+            "brand": "Dr. Jart+",
+            "name": "Dermask Micro Jet Clearing Solution",
+            "category": "Sheet Mask",
+            "step": "mask",
+            "score": 0.6174,
+            "match": 0.3424,
+            "rule_score": 0.55,
+            "summary": "Chosen for your acne, oiliness, mainly thanks to Niacinamide, Salicylic Acid.",
+            "key_ingredients": [
+              "Niacinamide: controls oil, calms inflammation — helps with acne, oiliness",
+              "Salicylic Acid: fights acne — helps with acne",
+              "Glycerin: hydrates"
+            ],
+            "why": [
+              "Helps fight acne (Salicylic Acid)",
+              "Suited to oily and combination skin",
+              "Lightweight texture suited to hot, humid weather"
+            ],
+            "cautions": []
+          }
+        }
+      ],
+      "conflicts": []
+    },
+    "notes": [],
+    "disclaimer": "SkinIQ gives general skincare guidance, not a medical diagnosis. For persistent or severe skin problems, or before using new actives while pregnant, consult a dermatologist.",
+    "usce": {
+      "skin_type": "combination",
+      "skin_type_scores": {
+        "normal": 0.1,
+        "oily": 0.1,
+        "dry": 0.2,
+        "combination": 0.6
+      },
+      "skin_type_source": "questionnaire",
+      "skin_type_reasons": [
+        "Where does your skin get oily or shiny? — Only my forehead, nose and chin (T-zone)",
+        "How oily does your skin become throughout the day? — Slightly oily",
+        "After washing your face, does your skin feel tight or dry? — Sometimes",
+        "Do you frequently experience dry patches or flakiness? — Sometimes"
+      ],
+      "concerns": {
+        "acne": {
+          "condition": "acne",
+          "score": 0.9982,
+          "status": "detected",
+          "photo": 0.9982,
+          "self_reported": 0.7,
+          "sources": [
+            "photo",
+            "questionnaire"
+          ],
+          "locations": []
+        },
+        "blackheads": {
+          "condition": "blackheads",
+          "score": 0.0011,
+          "status": "none",
+          "photo": 0.0011,
+          "self_reported": 0.0,
+          "sources": [],
+          "locations": []
+        },
+        "wrinkles": {
+          "condition": "wrinkles",
+          "score": 0.0007,
+          "status": "none",
+          "photo": 0.0007,
+          "self_reported": 0.0,
+          "sources": [],
+          "locations": []
+        },
+        "hyperpigmentation": {
+          "condition": "hyperpigmentation",
+          "score": 0.0005,
+          "status": "none",
+          "photo": 0.0005,
+          "self_reported": 0.0,
+          "sources": [],
+          "locations": []
+        },
+        "enlarged_pores": {
+          "condition": "enlarged_pores",
+          "score": 0.0002,
+          "status": "none",
+          "photo": 0.0002,
+          "self_reported": 0.0,
+          "sources": [],
+          "locations": []
+        },
+        "redness": {
+          "condition": "redness",
+          "score": 0.0,
+          "status": "none",
+          "photo": 0.0,
+          "self_reported": 0.0,
+          "sources": [],
+          "locations": []
+        }
+      },
+      "sensitivity": 0.3333,
+      "is_sensitive": false,
+      "pregnant": false,
+      "age_group": "18_24",
+      "medical_conditions": [],
+      "goals": [
+        "acne_control",
+        "oil_control"
+      ],
+      "avoid_ingredients": [
+        "fragrance"
+      ],
+      "environment": {
+        "temperature_c": 32,
+        "humidity_pct": 78,
+        "uv_index": 10,
+        "location": "Shah Alam",
+        "uv_level": "very_high",
+        "flags": {
+          "high_uv": true,
+          "humid": true,
+          "dry_air": false,
+          "hot": true,
+          "cold": false
+        }
+      },
+      "has_photo": true,
+      "detected_conditions": [
+        "acne"
+      ],
+      "possible_conditions": [],
+      "vector": {
+        "skin_type:normal": 0.1,
+        "skin_type:oily": 0.1,
+        "skin_type:dry": 0.2,
+        "skin_type:combination": 0.6,
+        "concern:acne": 0.9982,
+        "concern:blackheads": 0.0011,
+        "concern:hyperpigmentation": 0.0005,
+        "concern:redness": 0.0,
+        "concern:enlarged_pores": 0.0002,
+        "concern:wrinkles": 0.0007,
+        "sensitivity": 0.3333,
+        "pregnant": 0.0,
+        "age": 0.0,
+        "goal:hydration": 0.0,
+        "goal:acne_control": 1.0,
+        "goal:oil_control": 1.0,
+        "goal:brightening": 0.0,
+        "goal:anti_aging": 0.0,
+        "goal:sensitivity_reduction": 0.0,
+        "goal:pigmentation_reduction": 0.0,
+        "goal:sun_protection": 0.0,
+        "avoid:fragrance": 1.0,
+        "avoid:alcohol": 0.0,
+        "avoid:essential_oils": 0.0,
+        "avoid:retinol": 0.0,
+        "avoid:salicylic_acid": 0.0,
+        "avoid:chemical_sunscreens": 0.0,
+        "env:temperature": 0.8,
+        "env:humidity": 0.78,
+        "env:uv_index": 0.9091,
+        "env:high_uv": 1.0,
+        "env:humid": 1.0,
+        "env:dry_air": 0.0,
+        "env:hot": 1.0,
+        "env:cold": 0.0,
+        "env:known": 1.0
+      }
+    }
+  }
+}
