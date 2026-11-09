@@ -1,4 +1,4 @@
-"""SkinIQ Streamlit prototype (proposal 3.7). Full UI is built in step 8."""
+"""SkinIQ Streamlit prototype (proposal 3.7). Run: streamlit run app/streamlit_app.py"""
 
 import sys
 from pathlib import Path
@@ -9,19 +9,15 @@ import streamlit as st
 # so the skiniq package is importable locally and on Streamlit Community Cloud.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from skiniq.config import SKIN_CONDITIONS, SKIN_TYPES
+st.set_page_config(page_title="SkinIQ", page_icon=":material/face_retouching_natural:", layout="centered")
 
-st.set_page_config(page_title="SkinIQ", page_icon="🌸", layout="centered")
-
-st.title("SkinIQ")
-st.caption("Personalized Korean Skincare Advisory Platform")
-
-st.info("Prototype under development. Skin analysis and recommendations are coming in later steps.")
-
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("Skin types")
-    st.write(", ".join(t.title() for t in SKIN_TYPES))
-with col2:
-    st.subheader("Skin conditions")
-    st.write(", ".join(c.replace("_", " ").title() for c in SKIN_CONDITIONS))
+page = st.navigation([
+    st.Page("app_pages/analyse.py", title="Analyse my skin", icon=":material/face_retouching_natural:",
+            default=True,
+            help="Answer a short questionnaire, add a face photo and your location, and get a personalised "
+                 "Korean skincare routine with reasons for every product."),
+    st.Page("app_pages/about.py", title="About", icon=":material/info:",
+            help="How SkinIQ works: the photo model, questionnaire, weather, safety rules and product ranking, "
+                 "plus data sources and limitations."),
+])
+page.run()
