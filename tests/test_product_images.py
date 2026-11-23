@@ -22,6 +22,7 @@ from fetch_product_images import core, page_image, similarity, slugify  # noqa: 
     ("Neogen Black Energy Cream", "Neogen Dermalogy Black Energy Cream"),                    # sub-brand dropped
     ("Round Lab Birch Juice Moisturizing Cleanser", "Round Lab Birch Juice Moisturising Cleanser"),  # spelling
     ("Dr. Jart+ Ceramidin™ Cream", "Dr. Jart+ Ceramidin Cream"),
+    ("innisfree Green Tea Balancing Skin Toner Ex", "innisfree Green Tea Balancing Toner"),  # renamed edition
 ])
 def test_same_product_matches(found, wanted):
     assert similarity(found, wanted) >= 0.75
@@ -37,6 +38,10 @@ def test_same_product_matches(found, wanted):
     ("Round Lab For Men Birch Juice Moisturizing Toner", "Round Lab For Men Birch Juice Moisturizing Lotion"),
     ("Holika Holika One Solution Super Energy Ampoule (Anti-Wrinkle)",
      "Holika Holika One Solution Super Energy Ampoule (Brightening)"),
+    # an extra product-type word is a different product; a dropped variant name is not the variant
+    ("innisfree Green Tea Hyaluronic Acid Hydrating Eye Cream", "innisfree Green Tea Hyaluronic Acid Cream"),
+    ("innisfree My Real Squeeze Mask", "innisfree My Real Squeeze Mask [Pomegrenate]"),
+    ("ROUND LAB Pine Tree Soothing Cica Pad", "Round Lab Pine Tree Soothing Cica Toner"),
 ])
 def test_different_products_do_not_match(found, wanted):
     assert similarity(found, wanted) == 0.0

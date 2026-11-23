@@ -54,6 +54,7 @@ def core(text: str) -> str:
     """Name without sun-protection ratings, which are written many ways ('SPF50+/PA++++')."""
     t = normalise(re.sub(r"(?i)\bspf\s*\d*\+*|\bpa\s*\++", " ", text))
     t = re.sub(r"(\w)is(ing|er|e)\b", r"\1iz\2", t)  # moisturising -> moisturizing
+    t = re.sub(r"\boil free\b|\b(?:19|20)\d\d\b", " ", t)  # a description and edition years, not the product
     return re.sub(r"\s+", " ", t).strip()
 
 
@@ -61,11 +62,27 @@ def slugify(text: str) -> str:
     return normalise(text).replace(" ", "-")
 
 
-_FILLER = {"with", "and", "the", "for", "of", "tm"}  # "tm": the ™ sign written out
+_FILLER = {"with", "and", "the", "for", "of", "tm",  # "tm": the ™ sign written out
+           # edition markers: the same product in a newer or older edition
+           "old", "new", "renewed", "formula", "version", "edition", "ex", "mini"}
 
 
 def _words(text: str) -> set[str]:
     return {w for w in core(text).split() if w not in _FILLER}
+
+
+# Words naming what a product is: an extra one in the found name means a different product
+# (an eye cream is not the cream, a toner pad is not the toner).
+PRODUCT_TYPES = {"eye", "lip", "lips", "hand", "body", "hair", "mist", "pad", "pads", "mask", "masks", "toner",
+                 "cream", "serum", "essence", "ampoule", "cleanser", "foam", "oil", "balm", "gel", "lotion",
+                 "emulsion", "sunscreen", "suncream", "sunblock", "scrub", "peel", "peeling", "patch", "stick",
+                 "spray", "cushion", "kit", "set", "wash", "pack", "water", "milk"}
+
+
+def _variant_words(text: str) -> set[str]:
+    """Words naming a variant: in brackets or after ' - ', e.g. 'Mask [Pomegranate]', 'Mask - Calming'."""
+    parts = re.findall(r"[\(\[]([^\)\]]*)[\)\]]", text) + re.findall(r"\s[-–]\s(.*)$", text)
+    return {w for part in parts for w in core(part).split()} - _FILLER
 
 
 def similarity(found: str, wanted: str) -> float:
@@ -79,6 +96,9 @@ def similarity(found: str, wanted: str) -> float:
     """
     have, want = _words(found), _words(wanted)
     missing, extra = want - have, have - want
+    variant = _variant_words(wanted)
+    if (extra & PRODUCT_TYPES and want & PRODUCT_TYPES) or (variant and variant <= missing):
+        return 0.0  # another kind of product (eye cream for cream), or the wanted variant is not named
     ok = (not missing and len(extra) <= 2) or (len(missing) == 1 and not extra and len(want) >= 5)
     if not ok:
         return 0.0
@@ -158,13 +178,20 @@ def find(fetcher: Fetcher, brand: str, name: str) -> dict:
 
 
 def recheck(path: Path, fetcher: Fetcher) -> None:
-    """Validate every stored match against its page's own title (rewrites the CSV)."""
+    """Validate every stored match against its page's own title (rewrites the CSV). Titles
+    already stored are re-checked offline with the current rule; others are fetched."""
     with path.open(newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     changed = kept = 0
     for i, row in enumerate(rows, 1):
-        if row.get("page_url") and not row.get("page_title"):
-            title = f"{row['brand']} {row['product']}"
+        title = f"{row['brand']} {row['product']}"
+        if row.get("page_title"):  # checked before: re-apply the current rule to the stored title
+            if similarity(row["page_title"], title) < MIN_SIMILARITY:
+                was = row["page_title"]
+                row.update(find(fetcher, row["brand"], row["product"]))
+                row["match"] += f" (was {was})"
+                changed += 1
+        elif row.get("page_url"):
             r = fetcher.get(row["page_url"].replace(SITE, ""))
             found = page_title(r.text) if r is not None and r.status_code == 200 else ""
             if found and similarity(found, title) >= MIN_SIMILARITY:
