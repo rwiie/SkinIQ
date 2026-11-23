@@ -5,7 +5,7 @@ pipeline can read the answers by id.
 
 Skin type is assessed from the questionnaire: the image model could not learn
 skin type from photos (31.6% test accuracy, near chance), while oiliness,
-tightness and flakiness are what skin type actually measures. Question 8b
+tightness and flakiness are what skin type actually measures. Question 8
 ("where does your skin get oily?") separates combination skin (oily T-zone only)
 from oily skin.
 """
@@ -22,7 +22,7 @@ from skiniq.config import SKIN_TYPES
 class Question:
     id: str
     section: str
-    number: str
+    number: str  # "" for a follow-up shown only after another answer (pregnancy, after Q2 = Female)
     text: str
     options: dict[str, str]  # answer key -> label shown to the user
     multi: bool = False
@@ -42,25 +42,25 @@ QUESTIONS: tuple[Question, ...] = (
              {"18_25": "18–25", "26_35": "26–35", "36_49": "36–49", "50_plus": "50 and above"}),
     Question("gender", SECTION_A, "2", "What is your gender?",
              {"male": "Male", "female": "Female"}),
-    Question("pregnant", SECTION_A, "3", "Are you currently pregnant or breastfeeding?",
+    Question("pregnant", SECTION_A, "", "Are you currently pregnant or breastfeeding?",
              {"yes": "Yes", "no": "No"}),
-    Question("known_conditions", SECTION_A, "4", "Do you have any known skin conditions?",
+    Question("known_conditions", SECTION_A, "3", "Do you have any known skin conditions?",
              {"none": "None known", "rosacea": "Rosacea", "eczema": "Eczema", "psoriasis": "Psoriasis",
               "melasma": "Melasma", "dermatitis": "Dermatitis", "seborrheic_dermatitis": "Seborrheic dermatitis",
               "other": "Other"},
              multi=True, other_id="known_conditions_other"),
-    Question("sensitivity", SECTION_A, "5", "How would you describe your skin sensitivity?",
+    Question("sensitivity", SECTION_A, "4", "How would you describe your skin sensitivity?",
              {"not": "Not sensitive", "slightly": "Slightly sensitive",
               "moderately": "Moderately sensitive", "highly": "Highly sensitive"}),
-    # Section B: Skin characteristics and behaviour (Q7-9 decide skin type)
-    Question("reacts_to_products", SECTION_B, "6",
+    # Section B: Skin characteristics and behaviour (Q6-9 decide skin type)
+    Question("reacts_to_products", SECTION_B, "5",
              "Does your skin easily react to skincare products (e.g., redness, burning, itching, or irritation)?",
              {"yes": "Yes", "sometimes": "Sometimes", "no": "No"}),
-    Question("tightness", SECTION_B, "7", "After washing your face, does your skin feel tight or dry?",
+    Question("tightness", SECTION_B, "6", "After washing your face, does your skin feel tight or dry?",
              {"often": "Yes, often", "sometimes": "Sometimes", "rarely": "Rarely", "never": "Never"}),
-    Question("oiliness", SECTION_B, "8a", "How oily does your skin become throughout the day?",
+    Question("oiliness", SECTION_B, "7", "How oily does your skin become throughout the day?",
              {"very_oily": "Very oily", "slightly_oily": "Slightly oily", "balanced": "Balanced", "dry": "Dry"}),
-    Question("oil_location", SECTION_B, "8b", "Where does your skin get oily or shiny?",
+    Question("oil_location", SECTION_B, "8", "Where does your skin get oily or shiny?",
              {"t_zone": "T-zone only", "all_over": "All over", "nowhere": "Doesn’t get oily",
               "not_sure": "Not sure"},
              help="The T-zone is your forehead, nose and chin."),
@@ -85,7 +85,7 @@ QUESTIONS: tuple[Question, ...] = (
 
 QUESTIONS_BY_ID = {q.id: q for q in QUESTIONS}
 
-# Evidence points each answer gives to each skin type (Section B, Q7-9).
+# Evidence points each answer gives to each skin type (Section B, Q6-9).
 # Oiliness and where it appears carry the most weight; tightness and flakiness
 # separate dry from normal and add to combination when oil is also present.
 SKIN_TYPE_EVIDENCE: dict[str, dict[str, dict[str, float]]] = {
@@ -135,7 +135,7 @@ class SkinTypeAssessment:
 
 
 def assess_skin_type(answers: dict) -> SkinTypeAssessment:
-    """Score skin type from the Section B answers (Q7-9).
+    """Score skin type from the Section B answers (Q6-9).
 
     Raises ValueError if a required answer is missing or not a valid option.
     """

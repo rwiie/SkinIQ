@@ -192,7 +192,7 @@ def test_results_pdf_has_every_section(answers, kl_afternoon):
     assert pdf.startswith(b"%PDF")
     text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(pdf)).pages)
     for heading in ["Skin analysis", "Skin type", "Skin care for your age", "today's weather", "Advice for you",
-                    "Your routine", "Morning", "Evening", "not a medical diagnosis"]:
+                    "Your routine", "Morning", "Night", "not a medical diagnosis"]:
         assert heading in text, heading
     assert "Perioral dermatitis" in text
 

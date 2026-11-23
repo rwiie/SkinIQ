@@ -15,7 +15,8 @@ from skiniq.questionnaire import (
 
 def test_appendix_a_questions_present():
     numbers = [q.number for q in QUESTIONS]
-    assert numbers == ["1", "2", "3", "4", "5", "6", "7", "8a", "8b", "9", "10", "11", "12"]
+    assert numbers == ["1", "2", "", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]  # "" = pregnancy follow-up
+    assert QUESTIONS_BY_ID["pregnant"].number == "" and QUESTIONS_BY_ID["oil_location"].number == "8"
     assert len(QUESTIONS_BY_ID) == len(QUESTIONS)
     assert [len([q for q in QUESTIONS if q.section == s]) for s in SECTIONS] == [5, 6, 1, 1]
     assert list(QUESTIONS_BY_ID["age_group"].options.values()) == ["18–25", "26–35", "36–49", "50 and above"]

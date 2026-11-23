@@ -172,8 +172,8 @@ def build_pdf(result: dict, photo: bytes | None = None, generated: datetime | No
     routine = result["routine"]
     story += _routine_part("Morning", routine["morning"], st, width,
                            lead=[Paragraph("Your routine", st["h2"])])
-    story += _routine_part("Evening", routine["evening"], st, width)
-    story += _routine_part("Weekly extras", routine["weekly"], st, width, weekly=True)
+    story += _routine_part("Night", routine["evening"], st, width)
+    story += _routine_part("Weekly", routine["weekly"], st, width, weekly=True)
     if routine["conflicts"]:
         story.append(Paragraph("Ingredient conflicts", st["h3"]))
         story.append(_bullets([f"{c['reason']}: {c['advice']} ({' + '.join(c['products'])})."

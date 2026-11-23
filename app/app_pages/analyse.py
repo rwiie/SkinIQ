@@ -24,7 +24,7 @@ step = ss.step
 def question_widget(q) -> None:
     key = f"q_{q.id}"
     labels = q.options
-    label = f"{q.number}. {q.text}"
+    label = f"{q.number}. {q.text}" if q.number else q.text
     if q.multi:
         st.pills(label, list(labels), selection_mode="multi", format_func=labels.get, key=key,
                  persist_state="session", help=q.help or None)
@@ -46,7 +46,7 @@ def section(name: str) -> None:
         for q in QUESTIONS:
             if q.section != name:
                 continue
-            if q.id == "pregnant" and wizard.is_male():
+            if q.id == "pregnant" and not wizard.asks_pregnancy():
                 continue
             question_widget(q)
 
@@ -58,7 +58,7 @@ def location_section() -> None:
         ss.location = found
 
 
-def nav(next_label: str = "Next", next_icon: str = ":material/arrow_forward:") -> None:
+def nav(next_label: str = "Next", next_icon: str = ":material/arrow_forward:", skip: bool = False) -> None:
     if ss.nav_error:  # shown after a blocked "Next", until the problem is fixed
         ss.nav_error = wizard.step_problem(step)
         if ss.nav_error:
@@ -67,6 +67,9 @@ def nav(next_label: str = "Next", next_icon: str = ":material/arrow_forward:") -
         if step > wizard.PHOTO:
             st.button("Back", icon=":material/arrow_back:", on_click=wizard.go_back, key="back")
         st.space("stretch")
+        if skip:
+            st.button("Skip", on_click=wizard.skip_photo, key="skip",
+                      help="Continue without a photo: your skin concerns then come from your answers only.")
         st.button(next_label, type="primary", icon=next_icon, icon_position="right", on_click=wizard.go_next,
                   key="next")
 
@@ -84,12 +87,10 @@ def photo_step() -> None:
     progress()
     st.subheader("Your photo")
     source = st.segmented_control(
-        "Photo", ["Upload a photo", "Take a photo", "Skip"], default="Upload a photo", key="photo_source",
+        "Photo", ["Upload a photo", "Take a photo"], default="Upload a photo", key="photo_source",
         label_visibility="collapsed", persist_state="session",
     )
-    if source == "Skip":
-        st.caption("Without a photo, your skin concerns come from your answers only.")
-    elif ss.photo_bytes:
+    if ss.photo_bytes:
         st.image(ss.photo_bytes, width=260, caption="Your photo")
         st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
         st.button("Use a different photo", icon=":material/refresh:", on_click=wizard.clear_photo)
@@ -117,7 +118,7 @@ def photo_step() -> None:
                 else:
                     st.error(report.message, title="Photo not accepted", icon=":material/no_photography:")
     location_section()
-    nav()
+    nav(skip=True)
 
 
 # ---- steps 2-4: questionnaire -----------------------------------------------------------------
@@ -150,7 +151,7 @@ def run_analysis() -> None:
         weather_error = "location access was not available"
     else:
         weather_error = "your location could not be detected"
-    photo = ss.photo_bytes if ss.get("photo_source") != "Skip" else None
+    photo = wizard.photo_for_analysis()
     image = Image.open(io.BytesIO(photo)).convert("RGB") if photo else None
     with st.spinner("Analysing your skin and choosing products…"):
         get_product_index()
@@ -248,14 +249,17 @@ def results_step() -> None:
     st.info("\n".join(f"- {tip}" for tip in result["advice"]), icon=":material/lightbulb:")
 
     routine = result["routine"]
-    st.subheader("Your morning routine")
-    for s in routine["morning"]:
-        product_card(s)
-    st.subheader("Your evening routine")
-    for s in routine["evening"]:
-        product_card(s)
-    if routine["weekly"]:
-        st.subheader("Weekly extras")
+    st.subheader("Your routine")
+    morning, night, weekly = st.tabs(["Morning", "Night", "Weekly"])
+    with morning:
+        for s in routine["morning"]:
+            product_card(s)
+    with night:
+        for s in routine["evening"]:
+            product_card(s)
+    with weekly:
+        if not routine["weekly"]:
+            st.caption("No weekly extras suggested.")
         for s in routine["weekly"]:
             product_card(s, weekly=True)
     for c in routine["conflicts"]:

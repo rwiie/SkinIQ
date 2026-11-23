@@ -36,7 +36,8 @@ def answer(at, values: dict):
             at.radio(key=f"q_{qid}").set_value(value)
         else:
             at.segmented_control(key=f"q_{qid}").set_value(value)
-    return at.run()
+        at.run()  # one at a time, like a user: some questions appear only after an answer (pregnancy)
+    return at
 
 
 def nxt(at):
@@ -47,12 +48,12 @@ def start(location=SHAH_ALAM):
     at = AppTest.from_file(PAGE, default_timeout=180).run()
     if location is not None:
         at.session_state["geo"] = {"location": location}
-    at.segmented_control(key="photo_source").set_value("Skip").run()
-    return at
+        at.run()  # the photo page shows the detected location before the user moves on
+    return at.button(key="skip").click().run()
 
 
 def complete(at, a=None, b=None, cd=None):
-    nxt(answer(nxt(at), {**SECTION_A, **(a or {})}))   # photo -> A -> B
+    nxt(answer(at, {**SECTION_A, **(a or {})}))          # (skipped photo) A -> B
     nxt(answer(at, {**SECTION_B, **(b or {})}))         # B -> C & D
     nxt(answer(at, cd or {"goals": ["acne_control"], "avoid_ingredients": ["fragrance"]}))  # -> results
     return at
@@ -66,19 +67,26 @@ def texts(at):
 def test_photo_step_shows_photo_choice_and_location():
     at = AppTest.from_file(PAGE, default_timeout=120).run()
     assert not at.exception
-    assert at.segmented_control(key="photo_source").options == ["Upload a photo", "Take a photo", "Skip"]
+    assert at.segmented_control(key="photo_source").options == ["Upload a photo", "Take a photo"]
     assert any(s.value == "Your location" for s in at.subheader)
-    assert not any(b.key == "back" for b in at.button)  # no Back on the first step
+    keys = [b.key for b in at.button]
+    assert "back" not in keys  # no Back on the first step
+    assert keys[-2:] == ["skip", "next"]  # Skip sits just left of Next
 
 
 def test_next_needs_a_photo_or_skip():
     at = AppTest.from_file(PAGE, default_timeout=120).run()
     nxt(at)
-    assert at.session_state.step == 0 and "choose Skip" in at.error[0].value
+    assert at.session_state.step == 0 and "press Skip" in at.error[0].value
+
+
+def test_skip_goes_to_section_a_without_a_photo():
+    at = start()
+    assert at.session_state.step == 1 and at.session_state.photo_skipped
 
 
 def test_each_section_is_its_own_step():
-    at = nxt(start())
+    at = answer(start(), {"gender": "female"})
     keys = {w.key for w in [*at.segmented_control, *at.pills, *at.radio]}
     assert keys == {"q_age_group", "q_gender", "q_pregnant", "q_known_conditions", "q_sensitivity"}
     nxt(answer(at, SECTION_A))
@@ -90,27 +98,35 @@ def test_each_section_is_its_own_step():
 
 
 def test_missing_answers_block_next_and_are_listed():
-    at = nxt(answer(nxt(start()), {"age_group": "18_25"}))
+    at = nxt(answer(start(), {"age_group": "18_25"}))
     assert at.session_state.step == 1
-    assert "2, 3, 5" in at.error[0].value
+    assert at.error[0].value == "Please answer questions 2, 4."
+    at = nxt(answer(at, {"gender": "female", "sensitivity": "not"}))
+    assert at.error[0].value == "Please answer the pregnancy question."
 
 
 def test_back_keeps_answers():
-    at = nxt(answer(nxt(start()), SECTION_A))
+    at = nxt(answer(start(), SECTION_A))
     at.button(key="back").click().run()
     assert at.session_state.step == 1
     assert at.segmented_control(key="q_age_group").value == "26_35"
 
 
-def test_male_users_are_not_asked_about_pregnancy():
-    at = answer(nxt(start()), {"gender": "male"})
+def test_pregnancy_question_follows_gender_only_for_female():
+    at = start()
+    assert "q_pregnant" not in {w.key for w in at.segmented_control}  # gender not answered yet
+    at = answer(at, {"gender": "female"})
+    labels = [w.label for w in at.segmented_control]
+    assert labels.index("Are you currently pregnant or breastfeeding?") == labels.index("2. What is your gender?") + 1
+    assert "3. Do you have any known skin conditions?" in [w.label for w in at.pills]
+    at = answer(at, {"gender": "male"})
     assert "q_pregnant" not in {w.key for w in at.segmented_control}
     nxt(answer(at, {"age_group": "18_25", "sensitivity": "not"}))
     assert at.session_state.step == 2
 
 
 def test_other_shows_a_text_box():
-    at = answer(nxt(start()), {"known_conditions": ["other"]})
+    at = answer(start(), {"known_conditions": ["other"]})
     assert at.text_input(key="q_known_conditions_other")
 
 
@@ -119,6 +135,7 @@ def test_full_flow_shows_results_with_date_and_pdf():
     assert not at.exception
     assert at.session_state.step == 4 and at.title[0].value == "Your results"
     assert at.metric[0].value == "Oily"
+    assert [t.label for t in at.tabs] == ["Morning", "Night", "Weekly"]
     metrics = {m.label: m.value for m in at.metric}
     assert metrics["Avg temperature"] == "28.4 °C" and metrics["Peak UV index"] == "10.1"
     body = texts(at)
