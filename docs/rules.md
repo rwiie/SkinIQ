@@ -13,13 +13,14 @@ Hard exclusions are used only for safety (pregnancy, ingredients the user avoids
 | `S1_pregnancy_retinoid` | Pregnant or breastfeeding -> exclude retinoids | exclude | – | Bozzo et al. (2011); Kaplan et al. (2015) |
 | `S1_pregnancy_hydroquinone` | Pregnant or breastfeeding -> exclude hydroquinone | exclude | – | Bozzo et al. (2011) |
 | `S1_pregnancy_bha` | Pregnant or breastfeeding -> caution for salicylic acid / BHA | caution | -0.15 | Precaution (Bialas et al., 2023; Vinardell, 2015) |
-| `S2_avoid_fragrance` | User avoids fragrance -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S2_avoid_alcohol` | User avoids drying alcohol -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S2_avoid_essential_oils` | User avoids essential oils -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S2_avoid_retinol` | User avoids retinoids -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S2_avoid_salicylic_acid` | User avoids salicylic acid / BHA -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S2_avoid_chemical_sunscreens` | User avoids chemical UV filters -> exclude products containing it | exclude | – | User preference (Appendix A, Q11) |
-| `S3_medical_fragrance` | Rosacea, eczema, psoriasis or dermatitis -> exclude fragrance and essential oils | exclude | – | Hakulinen (2025); Schachner et al. (2023) |
+| `S2_avoid_fragrance` | User avoids fragrance -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_alcohol` | User avoids drying alcohol -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_essential_oils` | User avoids essential oils -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_retinol` | User avoids retinoids -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_salicylic_acid` | User avoids salicylic acid / BHA -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_chemical_sunscreens` | User avoids chemical UV filters -> exclude products containing it | exclude | – | User preference (questionnaire Q12) |
+| `S2_avoid_custom` | User typed other ingredients to avoid (Q12 'Other') -> exclude products containing them | exclude | – | User preference (questionnaire Q12, 'Other'); names standardised with the ingredient alias table |
+| `S3_medical_fragrance` | Rosacea, eczema, psoriasis, dermatitis or another reported condition -> exclude fragrance and essential oils | exclude | – | Hakulinen (2025); Schachner et al. (2023) |
 | `S3_medical_aggravates` | Rosacea or eczema-type condition -> caution for products flagged as aggravating it | caution | -0.25 | Product dataset tags |
 | `S4_sensitive_irritating` | Sensitive skin -> caution for products flagged as irritating | caution | -0.20 | Product dataset tags |
 | `S4_sensitive_fragrance` | Sensitive skin -> caution for fragrance, essential oils and drying alcohol | caution | -0.15 | Hakulinen (2025); Schachner et al. (2023) |

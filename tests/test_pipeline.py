@@ -66,7 +66,7 @@ def test_every_recommended_product_is_explained(answers, selfie, kl_afternoon):
 
 
 def test_morning_routine_has_no_retinoid_or_aha(answers, kl_afternoon):
-    r = analyse(answers(goals=["anti_aging"], age_group="45_54"), environment=kl_afternoon)
+    r = analyse(answers(goals=["anti_aging"], age_group="36_49"), environment=kl_afternoon)
     from skiniq.products import load_products
 
     by_title = {p.title: p for p in load_products()}
@@ -113,7 +113,7 @@ def test_safety_rules_hold_end_to_end(answers):
 def test_explanations_never_mention_the_wrong_skin_type(answers):
     r = analyse(answers(oiliness="dry", tightness="often", flakiness="yes"))
     text = " ".join(walk_strings(r["skin_analysis"]))
-    assert "skin type is dry" in text and "oily" not in r["skin_analysis"]["skin_type_text"]
+    assert "point to dry skin" in text and "oily" not in r["skin_analysis"]["skin_type_text"]
 
 
 # ---- routine assembly --------------------------------------------------------------------
@@ -162,3 +162,47 @@ def test_key_ingredients_match_user_needs(answers):
     keys = key_ingredients(p, u)
     assert keys[0]["ingredient"] == "Salicylic Acid" and "acne_control" in keys[0]["functions"]
     assert all(k["ingredient"] not in ("Water", "Xanthan Gum") for k in keys)
+
+
+@pytest.mark.parametrize("age", ["18_25", "26_35", "36_49", "50_plus"])
+def test_results_include_guidance_for_the_age_group(answers, age):
+    g = analyse(answers(age_group=age))["skin_analysis"]["age_guidance"]
+    assert g["age_group"] == age and g["care_focus"] and g["common_concerns"] and g["skin_changes"]
+
+
+def test_typed_avoid_ingredient_never_reaches_the_routine(answers):
+    r = analyse(answers(avoid_ingredients=["other"], avoid_other="niacinamide"))
+    picks = [s["product"] for part in ("morning", "evening") for s in r["routine"][part]]
+    from skiniq.products import load_products
+    by_title = {p.title: p for p in load_products()}
+    assert all(not by_title[p["product"]].containing("niacinamide") for p in picks)
+    assert any("Niacinamide" in tip for tip in r["advice"])
+
+
+def test_results_pdf_has_every_section(answers, kl_afternoon):
+    import io
+
+    from skiniq.report import build_pdf
+
+    PdfReader = pytest.importorskip("pypdf").PdfReader
+
+    r = analyse(answers(known_conditions=["other"], known_conditions_other="Perioral dermatitis"),
+                environment=kl_afternoon)
+    pdf = build_pdf(r)
+    assert pdf.startswith(b"%PDF")
+    text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(pdf)).pages)
+    for heading in ["Skin analysis", "Skin type", "Skin care for your age", "today's weather", "Advice for you",
+                    "Your routine", "Morning", "Evening", "not a medical diagnosis"]:
+        assert heading in text, heading
+    assert "Perioral dermatitis" in text
+
+
+@pytest.mark.parametrize("extra", [{}, {"avoid_ingredients": ["other"], "avoid_other": "niacinamide"},
+                                   {"known_conditions": ["other"], "known_conditions_other": "Perioral dermatitis",
+                                    "avoid_ingredients": ["other"], "avoid_other": "niacinamide"}])
+def test_acne_routines_do_not_stack_exfoliants(answers, extra):
+    # Regression: with a short candidate list every acne pick was a BHA product (up to 12 conflicts)
+    r = analyse(answers(age_group="26_35", sensitivity="slightly", reacts_to_products="sometimes",
+                        oiliness="very_oily", oil_location="t_zone", breakouts="frequently",
+                        goals=["acne_control"], **extra))
+    assert r["routine"]["conflicts"] == []

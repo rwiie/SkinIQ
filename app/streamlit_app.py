@@ -27,8 +27,9 @@ mimetypes.add_type("text/javascript", ".mjs")
 st.set_page_config(page_title="SkinIQ", page_icon=":material/face_retouching_natural:", layout="centered")
 
 page = st.navigation([
+    st.Page("app_pages/welcome.py", title="Welcome", icon=":material/home:", default=True,
+            help="Start here: what SkinIQ does and the Let's Start button."),
     st.Page("app_pages/analyse.py", title="Analyse my skin", icon=":material/face_retouching_natural:",
-            default=True,
             help="Answer a short questionnaire, add a face photo and your location, and get a personalised "
                  "Korean skincare routine with reasons for every product."),
     st.Page("app_pages/about.py", title="About", icon=":material/info:",

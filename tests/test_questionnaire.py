@@ -6,15 +6,36 @@ from skiniq.config import SKIN_TYPES
 from skiniq.questionnaire import (
     QUESTIONS,
     QUESTIONS_BY_ID,
+    SECTIONS,
     SKIN_TYPE_EVIDENCE,
     assess_skin_type,
+    explain_skin_type,
 )
 
 
 def test_appendix_a_questions_present():
     numbers = [q.number for q in QUESTIONS]
-    assert numbers == ["1", "2", "3", "4", "5", "6", "7", "7b", "8", "9", "10", "11"]
+    assert numbers == ["1", "2", "3", "4", "5", "6", "7", "8a", "8b", "9", "10", "11", "12"]
     assert len(QUESTIONS_BY_ID) == len(QUESTIONS)
+    assert [len([q for q in QUESTIONS if q.section == s]) for s in SECTIONS] == [5, 6, 1, 1]
+    assert list(QUESTIONS_BY_ID["age_group"].options.values()) == ["18–25", "26–35", "36–49", "50 and above"]
+    assert "other" in QUESTIONS_BY_ID["known_conditions"].options and QUESTIONS_BY_ID["known_conditions"].other_id
+    assert "other" in QUESTIONS_BY_ID["avoid_ingredients"].options and QUESTIONS_BY_ID["avoid_ingredients"].other_id
+
+
+@pytest.mark.parametrize("answers, label, expect", [
+    (dict(oiliness="very_oily", oil_location="all_over", tightness="rarely", flakiness="no"), "oily",
+     ["very oily all over your face", "rarely feels tight", "sebum"]),
+    (dict(oiliness="dry", oil_location="t_zone", tightness="often", flakiness="yes"), "dry",
+     ["stays dry during the day", "often feels tight"]),   # location ignored when skin is dry
+    (dict(oiliness="slightly_oily", oil_location="t_zone", tightness="often", flakiness="yes"), "combination",
+     ["T-zone", "typical sign of combination skin"]),
+])
+def test_skin_type_explanation_is_plain_text(answers, label, expect):
+    text = explain_skin_type(answers, label)
+    assert all(e in text for e in expect)
+    assert "?" not in text  # explains in sentences, does not repeat the questions
+    assert 2 <= text.count(". ") + 1 <= 3
 
 
 def test_evidence_uses_valid_options_and_skin_types():

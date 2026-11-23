@@ -8,7 +8,8 @@ from skiniq.environment import EnvironmentData
 from skiniq.fusion import ImageAnalysis
 
 BASE_ANSWERS = {
-    "age_group": "18_24",
+    "age_group": "18_25",
+    "gender": "female",
     "pregnant": "no",
     "known_conditions": ["none"],
     "sensitivity": "not",

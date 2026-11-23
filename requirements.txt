@@ -3,6 +3,7 @@ pandas>=2.2
 numpy>=1.26
 scikit-learn>=1.5
 requests>=2.32
+reportlab>=4.0
 pillow>=10.4
 torch>=2.4
 torchvision>=0.19

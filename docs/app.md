@@ -23,11 +23,21 @@ Open it at **http://localhost:8501**: the camera and location need a secure page
 
 | Page | Content |
 |---|---|
-| Analyse my skin | 1. Photo: upload, webcam (`st.camera_input`) or skip · 2. The Appendix A questionnaire (with question 7b), generated from `skiniq/questionnaire.py` · 3. Location · Results in the four sections of proposal 3.7: skin analysis, advice, routine (morning / evening / weekly tabs), and "Why this product" for every product · Download results as JSON |
+| Welcome | "Welcome to SkinIQ: Personalized Korean Skincare Advisory Platform" and a **Let's Start** button that opens Analyse my skin |
+| Analyse my skin | Step-by-step pages with **Back** (bottom left) and **Next** (bottom right): 1. Photo (upload, guided camera or skip) and automatic location · 2. Section A · 3. Section B · 4. Sections C & D, then **Analyse my skin** · 5. **Your results** (one scrolling page) |
 | About | How SkinIQ works, data sources, limitations and disclaimer |
 
-The questionnaire is one form, so the analysis runs only when "Analyse my skin" is pressed. All single-choice
-questions are required; missing ones are listed by number.
+The questions come from the updated questionnaire in `skiniq/questionnaire.py` (Q1–12, sections A–D).
+Single-choice questions are required: "Next" lists any that are missing by number. Answers are kept when going
+Back (`persist_state="session"`). Male users are not asked the pregnancy question. Choosing "Other" in Q4
+(known conditions) or Q12 (ingredients to avoid) shows a text box: a typed condition gets the same precautions as
+the listed medical conditions, and typed ingredients are standardised and excluded from the routine (rule
+`S2_avoid_custom`).
+
+**Your results:** skin type explained in plain sentences (not the questions), skin concerns, skin care for your
+age group, your location with today's date, the weather boxes with their source, advice, the morning, evening and
+weekly routines with "Why this product", and **Download results (PDF)** (`skiniq/report.py`). "Start again"
+clears the answers.
 
 ## Photo: guided camera and quality check
 

@@ -23,7 +23,7 @@ from skiniq.products import Product
 from skiniq.recommender import Recommendation, rank_products
 from skiniq.rules import check_routine
 
-CANDIDATES_PER_STEP = 8
+CANDIDATES_PER_STEP = 60  # deep enough that a conflict-free pick exists (8 left BHA stacks for acne)
 ALTERNATIVES = 2
 MORNING = ("cleanser", "toner", "treatment", "moisturizer", "sunscreen")
 EVENING = ("cleanser", "toner", "treatment", "moisturizer")
@@ -90,8 +90,9 @@ def build_routine(ranked: dict[str, list[Recommendation]], steps: tuple[str, ...
         options = [r for r in ranked.get(step, []) if _allowed(r, routine)]
         if not options:
             continue
-        picked = next((r for r in options
-                       if not check_routine([c.pick.product for c in chosen] + [r.product])), options[0])
+        current = [c.pick.product for c in chosen]
+        # best-ranked product that conflicts with nothing chosen so far, else the one with fewest conflicts
+        picked = min(options, key=lambda r: len(check_routine(current + [r.product])))
         alts = [r for r in options if r is not picked][:ALTERNATIVES]
         chosen.append(RoutineStep(step, picked, alts))
     conflicts = [{"products": list(c.products), "reason": c.reason, "advice": c.advice, "source": c.source}

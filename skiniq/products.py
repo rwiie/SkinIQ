@@ -139,6 +139,14 @@ class Product:
         """Ingredients of this product with a function, e.g. 'humectant' (for explanations)."""
         return [i for i in self.ingredients if any(function in r.functions for r in ingredient_info(i))]
 
+    def containing(self, term: str) -> list[str]:
+        """Ingredients whose (standardised) name contains `term`, e.g. 'paraben' -> 'Methylparaben'."""
+        t = standardize(term).lower()
+        if not t:
+            return []
+        forms = {t, t[:-1]} if t.endswith("s") and len(t) > 4 else {t}  # "parabens" -> "paraben"
+        return [i for i in self.ingredients if any(f in i.lower() for f in forms)]
+
     @property
     def exfoliants(self) -> list[str]:
         return [g for g in EXFOLIANT_GROUPS if g in self.groups]

@@ -13,6 +13,7 @@ JSON form passed to the app.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 
 from skiniq.config import (
@@ -23,14 +24,13 @@ from skiniq.config import (
     SKIN_TYPES,
 )
 from skiniq.environment import EnvironmentData
-from skiniq.questionnaire import QUESTIONS_BY_ID, assess_skin_type
+from skiniq.products import standardize
+from skiniq.questionnaire import QUESTIONS_BY_ID, assess_skin_type, explain_skin_type
 
 # Questionnaire answer -> skin condition concern it indicates, with a score on the
 # same 0-1 scale as the CNN probabilities. A known (diagnosed) condition is strong
 # evidence; breakout frequency is weaker evidence of acne.
 KNOWN_CONDITION_CONCERNS = {
-    "acne": "acne",
-    "hyperpigmentation": "hyperpigmentation",
     "melasma": "hyperpigmentation",
     "rosacea": "redness",
 }
@@ -42,13 +42,14 @@ MEDICAL_CONDITIONS = ("rosacea", "eczema", "psoriasis", "dermatitis", "seborrhei
 
 SENSITIVITY_LEVEL = {"not": 0, "slightly": 1, "moderately": 2, "highly": 3}
 REACTION_SCORE = {"yes": 2 / 3, "sometimes": 1 / 3, "no": 0.0}
-AGE_ORDER = ("18_24", "25_34", "35_44", "45_54", "55_plus")
+AGE_ORDER = ("18_25", "26_35", "36_49", "50_plus")
 
 GOALS = tuple(QUESTIONS_BY_ID["goals"].options)
-AVOIDABLE = tuple(k for k in QUESTIONS_BY_ID["avoid_ingredients"].options if k != "none")
+AVOIDABLE = tuple(k for k in QUESTIONS_BY_ID["avoid_ingredients"].options if k not in ("none", "other"))
+OTHER_CONDITION_FALLBACK = "another skin condition"  # "Other" ticked but nothing typed
 ENV_FLAGS = ("high_uv", "humid", "dry_air", "hot", "cold")
 
-REQUIRED_SINGLE = ("age_group", "pregnant", "sensitivity", "reacts_to_products", "breakouts")
+REQUIRED_SINGLE = ("age_group", "gender", "pregnant", "sensitivity", "reacts_to_products", "breakouts")
 MULTI_SELECT = ("known_conditions", "goals", "avoid_ingredients")
 
 
@@ -105,6 +106,10 @@ class USCE:
     avoid_ingredients: list[str]
     environment: EnvironmentData | None
     has_photo: bool
+    gender: str = ""
+    other_conditions: list[str] = field(default_factory=list)  # typed under "Other" (Q4)
+    avoid_custom: list[str] = field(default_factory=list)      # typed under "Other" (Q12), standardised names
+    skin_type_text: str = ""                                   # 2-3 sentence explanation for the results
 
     @property
     def detected_conditions(self) -> list[str]:
@@ -228,7 +233,15 @@ def build_usce(
         )
 
     # Sensitivity and safety
-    medical = [k for k in answers["known_conditions"] if k in MEDICAL_CONDITIONS]
+    # A condition typed under "Other" is treated like the listed medical conditions (gentle products)
+    other_conditions = []
+    if "other" in answers["known_conditions"]:
+        other_conditions = _split_free_text(answers.get("known_conditions_other")) or [OTHER_CONDITION_FALLBACK]
+    medical = [k for k in answers["known_conditions"] if k in MEDICAL_CONDITIONS] + other_conditions
+    avoid_custom = []
+    if "other" in answers["avoid_ingredients"]:
+        names = (standardize(t) for t in _split_free_text(answers.get("avoid_other")))
+        avoid_custom = list(dict.fromkeys(n.title() if n.islower() else n for n in names))
     level = SENSITIVITY_LEVEL[answers["sensitivity"]]
     sensitivity = max(level / 3, REACTION_SCORE[answers["reacts_to_products"]])
     is_sensitive = level >= 2 or answers["reacts_to_products"] == "yes" or bool(medical)
@@ -241,13 +254,17 @@ def build_usce(
         concerns=concerns,
         sensitivity=round(sensitivity, 4),
         is_sensitive=is_sensitive,
-        pregnant=answers["pregnant"] == "yes",
+        pregnant=answers["pregnant"] == "yes" and answers["gender"] != "male",
         age_group=answers["age_group"],
         medical_conditions=medical,
         goals=list(answers["goals"]),
-        avoid_ingredients=list(answers["avoid_ingredients"]),
+        avoid_ingredients=[a for a in answers["avoid_ingredients"] if a != "other"],
         environment=environment,
         has_photo=image is not None,
+        gender=answers["gender"],
+        other_conditions=other_conditions,
+        avoid_custom=avoid_custom,
+        skin_type_text=explain_skin_type(answers, skin_type),
     )
 
 
@@ -276,6 +293,14 @@ def _check_distribution(probs: dict[str, float], labels: tuple[str, ...], name: 
         raise ValueError(f"{name} probabilities must be between 0 and 1")
     if must_sum_to_one and abs(sum(probs.values()) - 1) > 0.01:
         raise ValueError(f"{name} probabilities must sum to 1, got {sum(probs.values()):.3f}")
+
+
+def _split_free_text(text: str | None) -> list[str]:
+    """'Niacinamide, vitamin C and parabens' -> ['Niacinamide', 'vitamin C', 'parabens']."""
+    if not text:
+        return []
+    parts = re.split(r"[,;/\n]+|\band\b|&", str(text))
+    return [p.strip(" .") for p in parts if len(p.strip(" .")) >= 3][:10]
 
 
 def _validate_answers(answers: dict) -> dict:

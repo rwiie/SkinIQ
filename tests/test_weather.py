@@ -33,7 +33,7 @@ TEMPS = [25.0] * 12 + [31.0] * 12            # mean 28.0
 HUMIDITY = [90] * 12 + [70] * 12             # mean 80
 UV = [0] * 7 + [1, 2, 4, 6, 8, 10, 10, 8, 6, 4, 2, 1] + [0] * 5   # daylight mean 5.17, peak 10
 METEO = Resp({"hourly": {"temperature_2m": TEMPS, "relative_humidity_2m": HUMIDITY, "uv_index": UV},
-              "daily": {"uv_index_max": [10.2]}})
+              "daily": {"time": ["2026-11-23"], "uv_index_max": [10.2]}})
 
 
 def test_daily_averages_at_coordinates(monkeypatch):
@@ -45,6 +45,17 @@ def test_daily_averages_at_coordinates(monkeypatch):
     assert (w.latitude, w.longitude, w.location) == (3.0733, 101.5185, "Seksyen 13, Shah Alam")
     params = calls[0][1]
     assert params["latitude"] == 3.0733 and params["timezone"] == "auto" and params["forecast_days"] == 1
+
+
+def test_forecast_date_is_the_local_day(monkeypatch):
+    monkeypatch.setattr(requests, "get", router({env.OPEN_METEO_FORECAST: METEO}))
+    w = fetch_weather_at(*SHAH_ALAM)
+    assert w.date == "2026-11-23" and w.date_label == "Monday, 23 November 2026"
+
+
+def test_unknown_date_gives_empty_label():
+    from skiniq.environment import EnvironmentData
+    assert EnvironmentData(28, 80, 4).date_label == ""
 
 
 def test_summary_line_shows_average_and_peak(monkeypatch):

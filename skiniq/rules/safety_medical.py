@@ -10,7 +10,7 @@ from skiniq.rules.base import Action, Rule, ingredient_list
 
 KB = "safety_medical"
 
-# Questionnaire Q11 option -> ingredient group
+# Questionnaire Q12 option -> ingredient group
 AVOID_GROUPS = {
     "fragrance": "fragrance",
     "alcohol": "drying_alcohol",
@@ -35,7 +35,7 @@ def _avoid_rule(option: str) -> Rule:
         applies=lambda u, o=option: o in u.avoid_ingredients,
         matches=lambda p, u, g=group: p.has(g),
         action=Action.EXCLUDE,
-        source="User preference (Appendix A, Q11)",
+        source="User preference (questionnaire Q12)",
         reason=lambda p, u, o=option, g=group: (
             f"Contains {AVOID_LABELS[o]} ({ingredient_list(p, g)}), which you asked to avoid"),
     )
@@ -71,8 +71,18 @@ RULES: list[Rule] = [
     ),
     *[_avoid_rule(o) for o in AVOID_GROUPS],
     Rule(
+        "S2_avoid_custom", KB,
+        "User typed other ingredients to avoid (Q12 'Other') -> exclude products containing them",
+        applies=lambda u: bool(u.avoid_custom),
+        matches=lambda p, u: any(p.containing(t) for t in u.avoid_custom),
+        action=Action.EXCLUDE,
+        source="User preference (questionnaire Q12, 'Other'); names standardised with the ingredient alias table",
+        reason=lambda p, u: "Contains " + ", ".join(
+            dict.fromkeys(i for t in u.avoid_custom for i in p.containing(t))) + ", which you asked to avoid",
+    ),
+    Rule(
         "S3_medical_fragrance", KB,
-        "Rosacea, eczema, psoriasis or dermatitis -> exclude fragrance and essential oils",
+        "Rosacea, eczema, psoriasis, dermatitis or another reported condition -> exclude fragrance and essential oils",
         applies=lambda u: bool(u.medical_conditions),
         matches=lambda p, u: p.has("fragrance") or p.has("essential_oil"),
         action=Action.EXCLUDE,

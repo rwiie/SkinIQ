@@ -45,6 +45,7 @@ class EnvironmentData:
     latitude: float | None = None
     longitude: float | None = None
     source: str = ""
+    date: str = ""                      # local calendar date of the forecast, ISO "YYYY-MM-DD"
 
     def __post_init__(self) -> None:
         if not 0 <= self.humidity_pct <= 100:
@@ -72,6 +73,15 @@ class EnvironmentData:
             "hot": self.temperature_c >= HOT_C,
             "cold": self.temperature_c < COLD_C,
         }
+
+    @property
+    def date_label(self) -> str:
+        """'Monday, 23 November 2026' (empty if unknown)."""
+        try:
+            d = datetime.strptime(self.date, "%Y-%m-%d")
+        except ValueError:
+            return ""
+        return f"{d:%A}, {d.day} {d:%B %Y}"
 
     def summary(self) -> str:
         """One line for the results page."""
@@ -134,14 +144,16 @@ def _open_meteo_today(lat: float, lon: float) -> dict:
     hourly = data.get("hourly") or {}
     uv_hours = [v for v in hourly.get("uv_index") or [] if v is not None]
     daylight = [v for v in uv_hours if v > 0]
-    peak = ((data.get("daily") or {}).get("uv_index_max") or [None])[0]
+    daily = data.get("daily") or {}
+    peak = (daily.get("uv_index_max") or [None])[0]
+    day = (daily.get("time") or [""])[0] or ((hourly.get("time") or [""])[0][:10])
     temp = _mean(hourly.get("temperature_2m") or [])
     humidity = _mean(hourly.get("relative_humidity_2m") or [])
     if temp is None or humidity is None:
         raise WeatherError("weather service returned incomplete data")
     return {"temperature_c": temp, "humidity_pct": humidity,
             "uv_index": _mean(daylight) if daylight else (0.0 if uv_hours else None),
-            "uv_max": peak if peak is not None else (max(uv_hours) if uv_hours else None)}
+            "uv_max": peak if peak is not None else (max(uv_hours) if uv_hours else None), "date": day}
 
 
 def _owm_today(lat: float, lon: float, api_key: str) -> dict:
@@ -155,7 +167,8 @@ def _owm_today(lat: float, lon: float, api_key: str) -> dict:
     humidity = _mean(i["main"]["humidity"] for i in items)
     if temp is None or humidity is None:
         raise WeatherError("OpenWeatherMap returned incomplete data")
-    return {"temperature_c": temp, "humidity_pct": humidity, "uv_index": None, "uv_max": None}
+    return {"temperature_c": temp, "humidity_pct": humidity, "uv_index": None, "uv_max": None,
+            "date": today.isoformat()}
 
 
 def _owm_place(lat: float, lon: float, api_key: str) -> str:
@@ -199,4 +212,5 @@ def fetch_weather_at(lat: float, lon: float, place: str | None = None, api_key: 
 
     return EnvironmentData(temperature_c=r(w["temperature_c"]), humidity_pct=round(float(w["humidity_pct"])),
                            uv_index=r(w["uv_index"]), location=name, uv_max=r(w["uv_max"]),
-                           latitude=round(lat, 5), longitude=round(lon, 5), source=source)
+                           latitude=round(lat, 5), longitude=round(lon, 5), source=source,
+                           date=w.get("date") or "")

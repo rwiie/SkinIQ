@@ -132,7 +132,7 @@ def test_pregnancy_flag(answers):
 
 # ---- answer validation ----------------------------------------------------------------
 
-@pytest.mark.parametrize("missing", ["age_group", "pregnant", "sensitivity", "reacts_to_products", "breakouts"])
+@pytest.mark.parametrize("missing", ["age_group", "gender", "pregnant", "sensitivity", "reacts_to_products", "breakouts"])
 def test_missing_required_answer_raises(answers, missing):
     a = answers()
     del a[missing]
@@ -176,7 +176,7 @@ def test_missing_environment_gives_zero_env_features(answers):
 
 
 def test_to_dict_is_json_serialisable(answers, image, kl_afternoon):
-    d = build_usce(answers(known_conditions=["acne"]), image(acne=0.7), kl_afternoon).to_dict()
+    d = build_usce(answers(breakouts="frequently"), image(acne=0.7), kl_afternoon).to_dict()
     restored = json.loads(json.dumps(d))
     assert restored["skin_type"] == "normal"
     assert restored["detected_conditions"] == ["acne"]
@@ -233,3 +233,28 @@ def test_photo_detection_below_possible_level_still_names_the_photo(answers):
     img = ImageAnalysis(conditions=multi(blackheads=0.17), independent=True, thresholds=thresholds)
     c = build_usce(answers(), img).concerns["blackheads"]
     assert c.status == "detected" and c.sources == ["photo"]
+
+
+# ---- updated questionnaire: gender and "Other" answers --------------------------------
+
+def test_male_user_is_never_treated_as_pregnant(answers):
+    assert build_usce(answers(gender="male", pregnant="yes")).pregnant is False
+    assert build_usce(answers(gender="female", pregnant="yes")).pregnant is True
+
+
+def test_gender_is_required(answers):
+    a = answers()
+    a["gender"] = "other"
+    with pytest.raises(ValueError, match="gender"):
+        build_usce(a)
+
+
+def test_other_is_not_part_of_the_fixed_avoid_features(answers):
+    usce = build_usce(answers(avoid_ingredients=["fragrance", "other"], avoid_other="Niacinamide"))
+    assert usce.avoid_ingredients == ["fragrance"] and usce.avoid_custom == ["Niacinamide"]
+    assert len(usce.vector()) == len(USCE.feature_names()) == 36
+
+
+def test_removed_condition_options_are_rejected(answers):
+    with pytest.raises(ValueError, match="known_conditions"):
+        build_usce(answers(known_conditions=["acne"]))

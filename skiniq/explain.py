@@ -8,6 +8,7 @@ product match, and the knowledge-base rules that fired.
 
 from __future__ import annotations
 
+from skiniq.age_guidance import age_guidance
 from skiniq.fusion import USCE
 from skiniq.products import Product, ingredient_info
 from skiniq.recommender import FORMULATION_FUNCTIONS, Recommendation, query_terms
@@ -69,14 +70,16 @@ def explain_skin_analysis(usce: USCE) -> dict:
 
     return {
         "skin_type": usce.skin_type,
-        "skin_type_text": f"Your skin type is {usce.skin_type}, based on your answers.",
+        "skin_type_text": usce.skin_type_text or f"Your skin type is {usce.skin_type}, based on your answers.",
         "skin_type_reasons": usce.skin_type_reasons[:3],
         "concerns": concerns,
         "no_concerns_text": None if concerns else "No skin concerns were detected.",
         "sensitive": usce.is_sensitive,
         "environment_text": env_text,
         "location": ({"place": env.location, "latitude": env.latitude, "longitude": env.longitude,
-                      "weather_source": env.source} if env else None),
+                      "weather_source": env.source, "date": env.date, "date_label": env.date_label}
+                     if env else None),
+        "age_guidance": age_guidance(usce.age_group),
         "photo_used": usce.has_photo,
     }
 
@@ -104,6 +107,11 @@ def personalised_advice(usce: USCE) -> list[str]:
     if usce.medical_conditions:
         tips.append("You reported " + ", ".join(c.replace("_", " ") for c in usce.medical_conditions)
                     + ": fragrance and essential oils were excluded. See a dermatologist if it flares.")
+    if usce.other_conditions:
+        tips.append("SkinIQ has no specific rules for " + ", ".join(usce.other_conditions)
+                    + ", so gentle products were chosen. Check with a dermatologist before starting new actives.")
+    if usce.avoid_custom:
+        tips.append("Products containing " + ", ".join(usce.avoid_custom) + " were left out, as you asked.")
     detected = set(usce.detected_conditions)
     if "acne" in detected:
         tips.append("Acne: avoid picking, change pillowcases often, and give a new routine 6–8 weeks.")

@@ -114,6 +114,25 @@ def test_avoided_ingredient_excludes_product(user, option, ingredient):
     assert f.action is Action.EXCLUDE and "asked to avoid" in f.reason
 
 
+@pytest.mark.parametrize("typed, ingredient", [
+    ("niacinamide", "Niacinamide"),
+    ("Vitamin C", "Ascorbic Acid"),          # common name standardised with the alias table
+    ("parabens, shea butter", "Methylparaben"),
+])
+def test_typed_other_ingredient_excludes_product(user, typed, ingredient):
+    u = user(avoid_ingredients=["other"], avoid_other=typed)
+    f = fired(u, product("Water", ingredient), "S2_avoid_custom")
+    assert f.action is Action.EXCLUDE and ingredient in f.reason and "asked to avoid" in f.reason
+    assert fired(u, product("Water", "Glycerin"), "S2_avoid_custom") is None
+
+
+@pytest.mark.parametrize("typed", ["", None, "  ,  ", "ab"])
+def test_other_ticked_but_nothing_usable_typed_excludes_nothing(user, typed):
+    u = user(avoid_ingredients=["other"], avoid_other=typed)
+    assert u.avoid_custom == []
+    assert fired(u, product("Water", "Niacinamide"), "S2_avoid_custom") is None
+
+
 def test_avoid_none_excludes_nothing(user):
     assert fired(user(avoid_ingredients=["none"]), product("Parfum"), "S2_avoid_fragrance") is None
 
@@ -124,6 +143,17 @@ def test_medical_condition_excludes_fragrance_and_essential_oils(user, condition
     assert fired(u, product("Parfum"), "S3_medical_fragrance").action is Action.EXCLUDE
     assert fired(u, product("Lavandula Angustifolia Oil"), "S3_medical_fragrance").action is Action.EXCLUDE
     assert fired(u, product("Helianthus Annuus Seed Oil"), "S3_medical_fragrance") is None
+
+
+def test_typed_other_condition_gets_medical_precautions(user):
+    u = user(known_conditions=["other"], known_conditions_other="Perioral dermatitis")
+    assert u.medical_conditions == ["Perioral dermatitis"] and u.is_sensitive
+    assert fired(u, product("Parfum"), "S3_medical_fragrance").action is Action.EXCLUDE
+
+
+def test_other_condition_without_text_still_counts(user):
+    u = user(known_conditions=["other"])
+    assert u.medical_conditions == ["another skin condition"]
 
 
 def test_rosacea_cautions_rosacea_flagged_product(user):

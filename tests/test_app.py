@@ -11,9 +11,9 @@ from skiniq.questionnaire import QUESTIONS_BY_ID
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGE = str(ROOT / "app" / "app_pages" / "analyse.py")
-FULL = dict(age_group="25_34", pregnant="no", sensitivity="not", reacts_to_products="no",
-            tightness="rarely", oiliness="very_oily", oil_location="all_over", flakiness="no",
-            breakouts="frequently")
+SECTION_A = dict(age_group="26_35", gender="female", pregnant="no", sensitivity="not")
+SECTION_B = dict(reacts_to_products="no", tightness="rarely", oiliness="very_oily", oil_location="all_over",
+                 flakiness="no", breakouts="frequently")
 
 
 SHAH_ALAM = {"status": "ok", "lat": 3.0733, "lon": 101.5185, "accuracy_m": 18, "place": "Seksyen 13, Shah Alam"}
@@ -25,19 +25,36 @@ def fake_weather(monkeypatch):
     monkeypatch.setattr(services, "fetch_weather_at",
                         lambda lat, lon, place=None, key=None: EnvironmentData(
                             28.4, 81, 4.6, place or "?", uv_max=10.1, latitude=lat, longitude=lon,
-                            source="Open-Meteo"))
+                            source="Open-Meteo", date="2026-11-23"))
 
 
-def fill(at, answers, location=SHAH_ALAM, **multi):
+def answer(at, values: dict):
+    for qid, value in values.items():
+        if isinstance(value, list):
+            at.pills(key=f"q_{qid}").set_value(value)
+        elif any(w.key == f"q_{qid}" for w in at.radio):
+            at.radio(key=f"q_{qid}").set_value(value)
+        else:
+            at.segmented_control(key=f"q_{qid}").set_value(value)
+    return at.run()
+
+
+def nxt(at):
+    return at.button(key="next").click().run()
+
+
+def start(location=SHAH_ALAM):
+    at = AppTest.from_file(PAGE, default_timeout=180).run()
     if location is not None:
         at.session_state["geo"] = {"location": location}
     at.segmented_control(key="photo_source").set_value("Skip").run()
-    for qid, value in answers.items():
-        widget = at.radio(key=f"q_{qid}") if qid == "oil_location" else at.segmented_control(key=f"q_{qid}")
-        widget.set_value(value)
-    for qid, values in multi.items():
-        at.pills(key=f"q_{qid}").set_value(values)
-    at.button[0].click().run()
+    return at
+
+
+def complete(at, a=None, b=None, cd=None):
+    nxt(answer(nxt(at), {**SECTION_A, **(a or {})}))   # photo -> A -> B
+    nxt(answer(at, {**SECTION_B, **(b or {})}))         # B -> C & D
+    nxt(answer(at, cd or {"goals": ["acne_control"], "avoid_ingredients": ["fragrance"]}))  # -> results
     return at
 
 
@@ -46,52 +63,106 @@ def texts(at):
         str(m.value) for m in at.markdown) + " " + " ".join(str(c.value) for c in at.caption)
 
 
-def test_page_renders_all_questions():
+def test_photo_step_shows_photo_choice_and_location():
     at = AppTest.from_file(PAGE, default_timeout=120).run()
     assert not at.exception
+    assert at.segmented_control(key="photo_source").options == ["Upload a photo", "Take a photo", "Skip"]
+    assert any(s.value == "Your location" for s in at.subheader)
+    assert not any(b.key == "back" for b in at.button)  # no Back on the first step
+
+
+def test_next_needs_a_photo_or_skip():
+    at = AppTest.from_file(PAGE, default_timeout=120).run()
+    nxt(at)
+    assert at.session_state.step == 0 and "choose Skip" in at.error[0].value
+
+
+def test_each_section_is_its_own_step():
+    at = nxt(start())
     keys = {w.key for w in [*at.segmented_control, *at.pills, *at.radio]}
-    assert {f"q_{q}" for q in QUESTIONS_BY_ID} <= keys
+    assert keys == {"q_age_group", "q_gender", "q_pregnant", "q_known_conditions", "q_sensitivity"}
+    nxt(answer(at, SECTION_A))
+    keys = {w.key for w in [*at.segmented_control, *at.pills, *at.radio]}
+    assert keys == {f"q_{k}" for k in SECTION_B}
+    nxt(answer(at, SECTION_B))
+    assert {w.key for w in at.pills} == {"q_goals", "q_avoid_ingredients"}
+    assert at.button(key="next").label == "Analyse my skin"
 
 
-def test_missing_answers_are_listed():
-    at = fill(AppTest.from_file(PAGE, default_timeout=120).run(), {"age_group": "18_24"})
+def test_missing_answers_block_next_and_are_listed():
+    at = nxt(answer(nxt(start()), {"age_group": "18_25"}))
+    assert at.session_state.step == 1
+    assert "2, 3, 5" in at.error[0].value
+
+
+def test_back_keeps_answers():
+    at = nxt(answer(nxt(start()), SECTION_A))
+    at.button(key="back").click().run()
+    assert at.session_state.step == 1
+    assert at.segmented_control(key="q_age_group").value == "26_35"
+
+
+def test_male_users_are_not_asked_about_pregnancy():
+    at = answer(nxt(start()), {"gender": "male"})
+    assert "q_pregnant" not in {w.key for w in at.segmented_control}
+    nxt(answer(at, {"age_group": "18_25", "sensitivity": "not"}))
+    assert at.session_state.step == 2
+
+
+def test_other_shows_a_text_box():
+    at = answer(nxt(start()), {"known_conditions": ["other"]})
+    assert at.text_input(key="q_known_conditions_other")
+
+
+def test_full_flow_shows_results_with_date_and_pdf():
+    at = complete(start())
     assert not at.exception
-    assert at.error and "4, 5, 6, 7, 7b, 8, 9" in at.error[0].value
-    assert not any("Your results" in h.value for h in at.header)
-
-
-def test_full_submission_shows_location_and_daily_weather():
-    at = fill(AppTest.from_file(PAGE, default_timeout=180).run(), FULL,
-              goals=["acne_control"], avoid_ingredients=["fragrance"])
-    assert not at.exception
-    assert any("Your results" in h.value for h in at.header)
-    assert not at.text_input  # no location box: location is detected automatically
+    assert at.session_state.step == 4 and at.title[0].value == "Your results"
     assert at.metric[0].value == "Oily"
     metrics = {m.label: m.value for m in at.metric}
-    assert metrics["Avg temperature"] == "28.4 °C" and metrics["Avg humidity"] == "81%"
-    assert metrics["Avg UV index"] == "4.6" and metrics["Peak UV index"] == "10.1"
+    assert metrics["Avg temperature"] == "28.4 °C" and metrics["Peak UV index"] == "10.1"
     body = texts(at)
-    assert "Seksyen 13, Shah Alam" in body and "3.0733, 101.5185" in body
-    assert "Today's average in Seksyen 13, Shah Alam" in body
+    assert "Your answers point to oily skin" in body
+    assert "?" not in at.session_state.result["skin_analysis"]["skin_type_text"]
+    assert "Monday, 23 November 2026" in body and "Source: Open-Meteo." in body
+    assert "Today's average" not in body  # no repeated weather sentence
+    assert "Seksyen 13, Shah Alam" in body
+    assert "Skin care for your age (26–35)" in [s.value for s in at.subheader]
+    assert at.session_state.result_pdf.startswith(b"%PDF")
     assert at.session_state.result["routine"]["morning"][-1]["step"] == "sunscreen"
+
+
+def test_start_again_clears_answers():
+    at = complete(start())
+    at.button(key="restart").click().run()
+    assert at.session_state.step == 0 and at.session_state.result is None
+    assert "q_age_group" not in at.session_state
 
 
 def test_weather_failure_shows_a_single_clear_note(monkeypatch):
     def fail(lat, lon, place=None, key=None):
         raise WeatherError("weather service rate limit reached; try again later")
     monkeypatch.setattr(services, "fetch_weather_at", fail)
-    at = fill(AppTest.from_file(PAGE, default_timeout=180).run(), FULL)
+    at = complete(start())
     assert not at.exception
     notes = [w.value for w in at.warning if "eather" in w.value]
     assert notes == ["Weather unavailable (weather service rate limit reached; try again later), "
                      "so no weather adjustments were made."]
 
 
-def test_location_denied_still_gives_results(monkeypatch):
+def test_location_denied_still_gives_results():
     denied = {"status": "error", "code": 1, "message": "Location access was blocked."}
-    at = fill(AppTest.from_file(PAGE, default_timeout=180).run(), FULL, location=denied)
-    assert not at.exception and any("Your results" in h.value for h in at.header)
+    at = complete(start(location=denied))
+    assert not at.exception and at.title[0].value == "Your results"
     assert any("location access was not available" in w.value for w in at.warning)
+
+
+def test_welcome_page():
+    at = AppTest.from_file(str(ROOT / "app" / "app_pages" / "welcome.py")).run()
+    assert not at.exception
+    body = texts(at)
+    assert "Welcome to SkinIQ" in body and "Personalized Korean Skincare Advisory Platform" in body
+    assert at.button(key="start").label == "Let's Start"
 
 
 def test_about_page():
