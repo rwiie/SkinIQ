@@ -32,7 +32,7 @@ questions are required; missing ones are listed by number.
 ## Photo: guided camera and quality check
 
 - **Guided camera** (`app/components/camera.py`, a Streamlit custom component): live video with a head-and-shoulders
-  outline. Face detection runs in the browser (MediaPipe face detector, bundled in `app/static/mediapipe/` and
+  outline. Face detection runs in the browser (YuNet via ONNX Runtime Web on the CPU, no WebGL needed; bundled in `app/static/facedetect/` and
   served with `server.enableStaticServing`). The outline is **red** with a hint (no face, more than one face,
   centre your face, move closer/back, too dark/bright) and turns **green** when exactly one face is centred at
   the right distance in enough light; only then is "Take photo" enabled.

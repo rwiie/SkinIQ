@@ -121,3 +121,24 @@ def test_coordinates_are_exact_when_no_place_name(monkeypatch):
         28, 80, 4, place or coordinates_label(lat, lon), uv_max=10, latitude=lat, longitude=lon))
     w = services.get_weather_at(3.07334, 101.51851)
     assert w.location == "3.0733° N, 101.5185° E" and (w.latitude, w.longitude) == (3.07334, 101.51851)
+
+
+def test_browser_face_detector_is_bundled():
+    from app.components.camera import STATIC_BASE
+
+    static = ROOT / STATIC_BASE
+    for name in ["ort.wasm.bundle.min.mjs", "ort-wasm-simd-threaded.mjs", "ort-wasm-simd-threaded.wasm",
+                 "yunet_2023mar_dynamic.onnx"]:
+        assert (static / name).is_file(), name
+
+
+def test_browser_yunet_accepts_the_camera_input_size():
+    ort = pytest.importorskip("onnxruntime")
+    import numpy as np
+
+    from app.components.camera import STATIC_BASE
+
+    session = ort.InferenceSession(str(ROOT / STATIC_BASE / "yunet_2023mar_dynamic.onnx"))
+    out = dict(zip([o.name for o in session.get_outputs()],
+                   session.run(None, {"input": np.zeros((1, 3, 256, 320), np.float32)})))
+    assert out["cls_8"].shape == (1, (256 // 8) * (320 // 8), 1) and out["bbox_32"].shape == (1, 80, 4)

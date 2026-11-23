@@ -2,8 +2,9 @@
 
 The outline is red until exactly one face is centred in it at the right distance and in
 enough light, then turns green and the "Take photo" button is enabled. Face detection
-runs in the browser with MediaPipe (bundled in app/static/mediapipe, served by
-Streamlit static serving). If the detector cannot load, the guide stays grey, the photo
+runs in the browser on the CPU with YuNet (the same detector as the server-side photo
+check) and ONNX Runtime Web, bundled in app/static/facedetect and served by Streamlit
+static serving. It needs no WebGL / graphics acceleration. If the detector cannot load, the guide stays grey, the photo
 can still be taken (the status line says why), and the server-side quality check (skiniq.vision.quality) decides.
 
 Result, kept in st.session_state[key]["photo"]: a JPEG data URL, or None after "Retake".
@@ -15,7 +16,7 @@ import base64
 
 import streamlit as st
 
-STATIC_BASE = "app/static/mediapipe/"
+STATIC_BASE = "app/static/facedetect/"
 
 _HTML = """
 <div class="cam">
@@ -72,8 +73,10 @@ const instances = new WeakMap();
 // Guide geometry in the 640x480 guide space (matches the SVG ellipse).
 const OVAL = { cx: 320, cy: 205, rx: 118, ry: 152 };
 
-const LOAD_TIMEOUT_MS = 25000;   // the detector is ~9 MB of WebAssembly on first load
+const LOAD_TIMEOUT_MS = 25000;   // ~11 MB of WebAssembly on first load
 const MAX_FRAME_ERRORS = 8;      // consecutive failed frames before falling back
+const IN_W = 320, IN_H = 256;    // detector input (multiples of 32); frames are letterboxed into it
+const SCORE_MIN = 0.6, NMS_IOU = 0.3;
 
 let detectorPromise = null;
 let detectorError = "";
@@ -81,13 +84,12 @@ function loadDetector(base) {
   if (!detectorPromise) {
     const load = (async () => {
       const root = new URL(base, document.baseURI).href;
-      const vision = await import(root + "vision_bundle.mjs");
-      const files = await vision.FilesetResolver.forVisionTasks(root + "wasm");
-      return vision.FaceDetector.createFromOptions(files, {
-        baseOptions: { modelAssetPath: root + "blaze_face_short_range.tflite", delegate: "CPU" },
-        runningMode: "VIDEO",
-        minDetectionConfidence: 0.6,
-      });
+      const ort = await import(root + "ort.wasm.bundle.min.mjs");
+      ort.env.wasm.wasmPaths = root;
+      ort.env.wasm.numThreads = 1;  // no SharedArrayBuffer needed
+      const session = await ort.InferenceSession.create(root + "yunet_2023mar_dynamic.onnx",
+        { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      return makeDetector(ort, session);
     })();
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("timed out loading the face detector")), LOAD_TIMEOUT_MS));
@@ -100,6 +102,54 @@ function loadDetector(base) {
     });
   }
   return detectorPromise;
+}
+
+function iou(a, b) {
+  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h);
+  const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  return inter / (a.w * a.h + b.w * b.h - inter);
+}
+
+// YuNet (OpenCV Zoo, 2023mar) on a letterboxed frame; returns faces in video pixels.
+function makeDetector(ort, session) {
+  const canvas = document.createElement("canvas");
+  canvas.width = IN_W; canvas.height = IN_H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const input = new Float32Array(3 * IN_W * IN_H);
+  return async (video) => {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const sc = Math.min(IN_W / vw, IN_H / vh);
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, IN_W, IN_H);
+    ctx.drawImage(video, 0, 0, vw * sc, vh * sc);
+    const px = ctx.getImageData(0, 0, IN_W, IN_H).data, n = IN_W * IN_H;
+    for (let i = 0; i < n; i++) {  // planar BGR, 0-255 (as cv2.dnn.blobFromImage)
+      input[i] = px[i * 4 + 2]; input[n + i] = px[i * 4 + 1]; input[2 * n + i] = px[i * 4];
+    }
+    const out = await session.run({ input: new ort.Tensor("float32", input, [1, 3, IN_H, IN_W]) });
+    const cands = [];
+    for (const st of [8, 16, 32]) {
+      const cols = IN_W / st, cls = out["cls_" + st].data, obj = out["obj_" + st].data, bb = out["bbox_" + st].data;
+      for (let i = 0; i < cls.length; i++) {
+        const score = Math.sqrt(Math.min(Math.max(cls[i], 0), 1) * Math.min(Math.max(obj[i], 0), 1));
+        if (score < SCORE_MIN) continue;
+        const r = Math.floor(i / cols), c = i % cols;
+        const cx = (c + bb[i * 4]) * st, cy = (r + bb[i * 4 + 1]) * st;
+        const w = Math.exp(bb[i * 4 + 2]) * st, h = Math.exp(bb[i * 4 + 3]) * st;
+        cands.push({ score, x: (cx - w / 2) / sc, y: (cy - h / 2) / sc, w: w / sc, h: h / sc });
+      }
+    }
+    cands.sort((a, b) => b.score - a.score);
+    const kept = [];
+    for (const f of cands) if (kept.every((k) => iou(k, f) < NMS_IOU)) kept.push(f);
+    // Like the server check: a much smaller face in the background is tolerated
+    const big = kept.length ? kept[0].w * kept[0].h : 0;
+    return kept.filter((f) => f.w * f.h >= 0.25 * big).map((f) => ({
+      score: f.score,
+      boundingBox: { originX: Math.max(0, f.x), originY: Math.max(0, f.y),
+                     width: Math.min(f.w, vw - Math.max(0, f.x)), height: Math.min(f.h, vh - Math.max(0, f.y)) },
+    }));
+  };
 }
 
 // Map a box from video pixels into the 640x480 guide space (object-fit: cover, mirrored).
@@ -172,27 +222,31 @@ export default function (component) {
   const startLoop = () => {
     stopLoop();
     const canvas = document.createElement("canvas");
-    let errors = 0, lastTs = 0;
+    let errors = 0;
     const startedAt = performance.now();
     setState("red", "Looking for your face…");
-    inst.timer = setInterval(() => {
-      if (!inst.detector) return;
+    let busy = false;
+    inst.timer = setInterval(async () => {
+      if (!inst.detector || busy) return;
       if (video.readyState < 2 || !video.videoWidth) {
         if (performance.now() - startedAt > 8000) setState("red", "Waiting for the camera picture…");
         return;
       }
+      const detect = inst.detector;
+      busy = true;
       let faces;
       try {
-        const ts = Math.max(performance.now(), lastTs + 1);  // timestamps must increase
-        lastTs = ts;
-        faces = inst.detector.detectForVideo(video, ts).detections || [];
+        faces = await detect(video);
         errors = 0;
       } catch (e) {
         errors += 1;
         console.warn("SkinIQ face detection failed on a frame:", e);
         if (errors >= MAX_FRAME_ERRORS) fallback((e && e.message) || "detection error");
         return;
+      } finally {
+        busy = false;
       }
+      if (inst.detector !== detect || !inst.timer || root.classList.contains("captured")) return;
       const [cls, text] = judge(faces, video, canvas);
       inst.aligned = cls === "green";
       setState(cls, text);
