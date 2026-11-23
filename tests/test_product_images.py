@@ -19,6 +19,9 @@ from fetch_product_images import core, page_image, similarity, slugify  # noqa: 
     ("Celimax Derma Nature Fresh Blackhead Jojoba Cleansing Oil",
      "Celimax Derma Nature Fresh Blackhead Cleansing Oil"),                                          # one extra word
     ("A'pieu Deep Clean Foam Cleanser", "A'Pieu Deep Clean Foam Cleanser"),
+    ("Neogen Black Energy Cream", "Neogen Dermalogy Black Energy Cream"),                    # sub-brand dropped
+    ("Round Lab Birch Juice Moisturizing Cleanser", "Round Lab Birch Juice Moisturising Cleanser"),  # spelling
+    ("Dr. Jart+ Ceramidin™ Cream", "Dr. Jart+ Ceramidin Cream"),
 ])
 def test_same_product_matches(found, wanted):
     assert similarity(found, wanted) >= 0.75
@@ -28,6 +31,12 @@ def test_same_product_matches(found, wanted):
     ("LANEIGE Moisturizing Foam Cleanser", "Laneige Moisturizing Cream Cleanser"),    # different product type
     ("innisfree Volcanic Clusters Pore Clearing Toner 2X", "innisfree Volcanic Clusters Pore Clearing Facial Foam"),
     ("COSRX Advanced Snail 96 Mucin Power Essence", "COSRX Advanced Snail 92 All In One Cream"),
+    # one word swapped for another = another product or variant (found in the first full run)
+    ("LANEIGE Water Bank Blue Hyaluronic Revitalizing Toner", "Laneige Water Bank Blue Hyaluronic Exfoliating Toner"),
+    ("A'pieu My Skin-Fit Sheet Mask (Lime)", "A'Pieu My Skin-Fit Sheet Mask (Olive)"),
+    ("Round Lab For Men Birch Juice Moisturizing Toner", "Round Lab For Men Birch Juice Moisturizing Lotion"),
+    ("Holika Holika One Solution Super Energy Ampoule (Anti-Wrinkle)",
+     "Holika Holika One Solution Super Energy Ampoule (Brightening)"),
 ])
 def test_different_products_do_not_match(found, wanted):
     assert similarity(found, wanted) == 0.0

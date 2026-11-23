@@ -43,8 +43,12 @@ clears the answers.
 with a "Photo: INKEEDecoder" link to its page; products without a photo show a placeholder. The links are in
 `data/knowledge/product_images.csv`, built once with `python tools/fetch_product_images.py` (robots.txt
 allows product pages; about one request per second; resumable). A product is matched by its page address or
-the site's search, and only when the names are the same product (every word of the catalogue name present,
-at most two extra words), so "Moisturizing Foam Cleanser" is never used for "Moisturizing Cream Cleanser".
+the site's search, and only when the page's own title names the same product: every word of the catalogue
+name present with at most two extra words, or one word of a long name dropped with nothing added (a
+sub-brand such as "Dermalogy"). A swapped word means another product or variant, so "Moisturizing Foam
+Cleanser" is never used for "Moisturizing Cream Cleanser" nor "Sheet Mask (Lime)" for "Sheet Mask (Olive)".
+The page title is checked (not just the search result name or address) because some pages on the site were
+renamed; `--recheck` re-validates every stored match and the CSV keeps each page's title.
 When the results are shown, the routine's photos are downloaded (in parallel, kept in memory) and tidied by
 `tidy_photo` (`skiniq/product_images.py`): a plain white/grey background is made transparent (near-white
 pixels connected to the photo's border, stopped at the product's outline so white bottles and labels are kept),
