@@ -1,5 +1,4 @@
 import io
-from html import escape
 
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
@@ -15,6 +14,7 @@ from skiniq.questionnaire import QUESTIONS
 from skiniq.report import build_pdf
 
 SINGLE_CHOICE_INLINE_MAX = 22  # longest option label shown as a segmented control
+PHOTO_PX = 140  # product photo square on the routine cards
 
 wizard.init()
 ss = st.session_state
@@ -164,7 +164,8 @@ def run_analysis() -> None:
             result["notes"].insert(0, f"Weather unavailable ({weather_error}), so no weather adjustments were made.")
         ss.result = result
         ss.result_photo = photo
-        ss.result_pdf = build_pdf(result, photo, product_photos=routine_photos(result))
+        ss.result_product_photos = routine_photos(result)
+        ss.result_pdf = build_pdf(result, photo, product_photos=ss.result_product_photos)
 
 
 def product_card(step_: dict, weekly: bool = False) -> None:
@@ -172,13 +173,13 @@ def product_card(step_: dict, weekly: bool = False) -> None:
     with st.container(border=True):
         photo, text = st.columns([1, 3], vertical_alignment="center")
         with photo:
-            if p.get("image_url"):
-                # fixed height so tall bottles and wide jars take the same space
-                st.html(f'<img src="{escape(p["image_url"], quote=True)}" alt="{escape(p["product"], quote=True)}" '
-                        'style="display:block;margin:0 auto;height:140px;max-width:100%;object-fit:contain">')
+            image = (ss.get("result_product_photos") or {}).get(p["product"])
+            if image:  # background removed, centred on a square: every card's photo is the same size
+                with st.container(horizontal_alignment="center"):
+                    st.image(image, alt=p["product"], width=PHOTO_PX)
                 st.caption(f"Photo: [{SOURCE_NAME}]({p['image_source']})", text_alignment="center")
             else:
-                with st.container(height=120, horizontal_alignment="center", vertical_alignment="center",
+                with st.container(height=PHOTO_PX, horizontal_alignment="center", vertical_alignment="center",
                                   border=False):
                     st.markdown(":gray[:material/image_not_supported:]  \n:gray[No photo]",
                                 text_alignment="center")

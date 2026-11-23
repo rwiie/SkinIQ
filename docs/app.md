@@ -45,7 +45,11 @@ with a "Photo: INKEEDecoder" link to its page; products without a photo show a p
 allows product pages; about one request per second; resumable). A product is matched by its page address or
 the site's search, and only when the names are the same product (every word of the catalogue name present,
 at most two extra words), so "Moisturizing Foam Cleanser" is never used for "Moisturizing Cream Cleanser".
-Images are loaded from INKEEDecoder's storage when shown; the PDF includes them too.
+When the results are shown, the routine's photos are downloaded (in parallel, kept in memory) and tidied by
+`tidy_photo` (`skiniq/product_images.py`): a plain white/grey background is made transparent (near-white
+pixels connected to the photo's border, stopped at the product's outline so white bottles and labels are kept),
+the product is trimmed and centred on a square with the same margin, so every card and the PDF show the
+products at the same size. Photos with a non-plain background are trimmed and centred but keep it.
 
 ## Photo: guided camera and quality check
 

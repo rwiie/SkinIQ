@@ -82,7 +82,7 @@ def _product_photo(data: bytes | None, st: dict):
     """A product photo scaled into a square cell, or a short 'no photo' note."""
     if data:
         try:
-            img = Image(io.BytesIO(data))
+            img = Image(io.BytesIO(data), mask="auto")  # keeps the transparent background
             scale = PRODUCT_PHOTO_MM * mm / max(img.imageWidth, img.imageHeight)
             img.drawWidth, img.drawHeight = img.imageWidth * scale, img.imageHeight * scale
             return img

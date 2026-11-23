@@ -58,3 +58,87 @@ def test_lookup_reads_the_table(tmp_path):
 
 def test_unknown_product_has_no_photo():
     assert pi.product_image("No Such Brand", "No Such Product") is None
+
+
+# ---- tidy_photo: background removal, trim and centring ----------------------------------------
+
+def _png(img) -> bytes:
+    import io
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _tidy(img, **kw):
+    import io
+
+    import numpy as np
+    from PIL import Image
+    out = Image.open(io.BytesIO(pi.tidy_photo(_png(img), **kw)))
+    return out, np.asarray(out)
+
+
+def _bottle(body=(250, 250, 250), size=(200, 400)):
+    """White photo with a product drawn in the middle: grey outline, `body` colour inside."""
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", size, (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    d.rectangle((60, 80, 140, 360), fill=body, outline=(150, 150, 150), width=3)
+    return img
+
+
+def test_white_background_becomes_transparent_and_product_is_kept():
+    out, a = _tidy(_bottle(body=(40, 120, 200)))
+    assert out.mode == "RGBA" and out.size == (pi.PHOTO_SIZE, pi.PHOTO_SIZE)
+    assert a[0, 0, 3] == 0 and a[-1, -1, 3] == 0          # corners: background removed
+    assert a[160, 160, 3] == 255                           # centre: product
+
+
+def test_white_product_on_white_background_is_not_erased():
+    _, a = _tidy(_bottle(body=(252, 252, 252)))
+    assert a[160, 160, 3] == 255  # the outline stops the background fill
+
+
+def test_product_is_trimmed_and_centred_with_even_margins():
+    _, a = _tidy(_bottle(body=(40, 120, 200)))
+    import numpy as np
+    ys, xs = np.nonzero(a[:, :, 3] > 16)
+    height = ys.max() - ys.min() + 1
+    assert abs(height - round(pi.PHOTO_FILL * pi.PHOTO_SIZE)) <= 3          # longer side fills 86%
+    assert abs(ys.min() - (pi.PHOTO_SIZE - 1 - ys.max())) <= 2               # centred vertically
+    assert abs(xs.min() - (pi.PHOTO_SIZE - 1 - xs.max())) <= 2               # centred horizontally
+
+
+def test_photo_with_a_scene_background_keeps_it():
+    from PIL import Image
+    import numpy as np
+    rng = np.random.default_rng(0)
+    scene = Image.fromarray(rng.integers(0, 200, (300, 300, 3), dtype=np.uint8))
+    _, a = _tidy(scene)
+    assert (a[:, :, 3] > 0).sum() > 0.7 * a.shape[0] * a.shape[1]  # nothing cut out
+
+
+def test_not_an_image_raises():
+    with pytest.raises(ValueError):
+        pi.tidy_photo(b"<html>not an image</html>")
+
+
+def test_routine_photos_skip_products_without_a_usable_photo(monkeypatch):
+    import app.services as services
+
+    services.product_photo.cache_clear()
+
+    class Resp:
+        def __init__(self, status, ctype, content):
+            self.status_code, self.headers, self.content = status, {"content-type": ctype}, content
+
+    responses = {"https://img/ok.png": Resp(200, "image/png", _png(_bottle(body=(40, 120, 200)))),
+                 "https://img/404.png": Resp(404, "text/html", b""),
+                 "https://img/html.png": Resp(200, "text/html", b"<html>")}
+    monkeypatch.setattr(services.requests, "get", lambda url, timeout: responses[url])
+    step = lambda title, url: {"product": {"product": title, "image_url": url}}
+    result = {"routine": {"morning": [step("A", "https://img/ok.png"), step("B", "https://img/404.png")],
+                          "evening": [step("C", "https://img/html.png"), step("D", None)], "weekly": []}}
+    photos = services.routine_photos(result)
+    assert list(photos) == ["A"] and photos["A"].startswith(b"\x89PNG")
+    services.product_photo.cache_clear()

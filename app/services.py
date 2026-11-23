@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from dataclasses import replace
 
 import requests
@@ -11,6 +13,7 @@ from PIL import Image
 
 from skiniq.environment import EnvironmentData, coordinates_label, fetch_weather_at
 from skiniq.pipeline import load_classifier
+from skiniq.product_images import tidy_photo
 from skiniq.recommender import default_index
 from skiniq.vision.quality import QualityReport, check_photo
 
@@ -60,23 +63,24 @@ def get_weather_at(lat: float, lon: float, place: str | None = None) -> Environm
     return replace(w, latitude=round(lat, 5), longitude=round(lon, 5), location=location)
 
 
-@st.cache_data(ttl=24 * 3600, max_entries=500, show_spinner=False)
+@lru_cache(maxsize=512)
 def product_photo(url: str) -> bytes | None:
-    """Download one product photo (for the PDF); None if it can't be fetched."""
+    """One product photo, background removed and centred on a square (PNG); None if unavailable."""
     try:
         r = requests.get(url, timeout=8)
-    except requests.RequestException:
+        if r.status_code != 200 or not r.headers.get("content-type", "").startswith("image/"):
+            return None
+        return tidy_photo(r.content)
+    except (requests.RequestException, ValueError):
         return None
-    if r.status_code != 200 or not r.headers.get("content-type", "").startswith("image/"):
-        return None
-    return r.content
 
 
 def routine_photos(result: dict) -> dict[str, bytes]:
-    """Photos of every product in the routine, keyed by product title."""
+    """Tidied photos of every product in the routine, keyed by product title (fetched in parallel)."""
     steps = [s for part in ("morning", "evening", "weekly") for s in result["routine"][part]]
     urls = {s["product"]["product"]: s["product"]["image_url"] for s in steps if s["product"].get("image_url")}
-    photos = {title: product_photo(url) for title, url in urls.items()}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        photos = dict(zip(urls, pool.map(product_photo, urls.values())))
     return {title: data for title, data in photos.items() if data}
 
 
