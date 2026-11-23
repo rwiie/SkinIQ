@@ -39,6 +39,14 @@ age group, your location with today's date, the weather boxes with their source,
 Weekly tabs with "Why this product", and **Download results (PDF)** (`skiniq/report.py`). "Start again"
 clears the answers.
 
+**Product photos:** each product card shows the product's photo from INKEEDecoder (formerly INCIDecoder),
+with a "Photo: INKEEDecoder" link to its page; products without a photo show a placeholder. The links are in
+`data/knowledge/product_images.csv`, built once with `python tools/fetch_product_images.py` (robots.txt
+allows product pages; about one request per second; resumable). A product is matched by its page address or
+the site's search, and only when the names are the same product (every word of the catalogue name present,
+at most two extra words), so "Moisturizing Foam Cleanser" is never used for "Moisturizing Cream Cleanser".
+Images are loaded from INKEEDecoder's storage when shown; the PDF includes them too.
+
 ## Photo: guided camera and quality check
 
 - **Guided camera** (`app/components/camera.py`, a Streamlit custom component): live video with a head-and-shoulders

@@ -29,6 +29,7 @@ st.markdown("""
 - Facial skin type images (Olimov, Kaggle) and skin condition images (Kaggle)
 - Skin-Problem-Detection-Relabel-Clean3 (Roboflow Universe, CC BY 4.0)
 - Korean skincare product data (Skinsort via Kaggle)
+- Product photos: INKEEDecoder (formerly INCIDecoder), linked from each product card
 - Weather: OpenWeatherMap and Open-Meteo
 """)
 

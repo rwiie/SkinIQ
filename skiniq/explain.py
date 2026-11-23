@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from skiniq.age_guidance import age_guidance
 from skiniq.fusion import USCE
+from skiniq.product_images import product_image
 from skiniq.products import Product, ingredient_info
 from skiniq.recommender import FORMULATION_FUNCTIONS, Recommendation, query_terms
 
@@ -158,6 +159,7 @@ def explain_product(rec: Recommendation, usce: USCE) -> dict:
         helps = f" — helps with {', '.join(_label(c) for c in k['helps_with'])}" if k["helps_with"] else ""
         reasons.append(f"{k['ingredient']}: {does}{helps}")
     benefits = [b for b in rec.assessment.benefits]
+    photo = product_image(rec.product.brand, rec.product.name) or {}
     return {
         "product": rec.product.title,
         "brand": rec.product.brand,
@@ -171,6 +173,8 @@ def explain_product(rec: Recommendation, usce: USCE) -> dict:
         "key_ingredients": reasons,
         "why": benefits,
         "cautions": rec.assessment.cautions,
+        "image_url": photo.get("image_url"),   # INKEEDecoder product photo (None if not found)
+        "image_source": photo.get("page_url"),
     }
 
 

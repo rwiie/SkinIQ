@@ -6,9 +6,10 @@ from PIL import Image, UnidentifiedImageError
 from app import wizard
 from app.components.camera import face_camera
 from app.components.geolocation import detect_location
-from app.services import get_classifier, get_product_index, get_weather_at, photo_quality
+from app.services import get_classifier, get_product_index, get_weather_at, photo_quality, routine_photos
 from skiniq.environment import WeatherError
 from skiniq.pipeline import analyse
+from skiniq.product_images import SOURCE_NAME
 from skiniq.questionnaire import QUESTIONS
 from skiniq.report import build_pdf
 
@@ -162,17 +163,28 @@ def run_analysis() -> None:
             result["notes"].insert(0, f"Weather unavailable ({weather_error}), so no weather adjustments were made.")
         ss.result = result
         ss.result_photo = photo
-        ss.result_pdf = build_pdf(result, photo)
+        ss.result_pdf = build_pdf(result, photo, product_photos=routine_photos(result))
 
 
 def product_card(step_: dict, weekly: bool = False) -> None:
     p = step_["product"]
     with st.container(border=True):
-        st.caption(step_["label"])
-        st.markdown(f"**{p['product']}**")
-        st.write(p["summary"])
-        if weekly:
-            st.caption(f"Use {step_['how_often']}.")
+        photo, text = st.columns([1, 3], vertical_alignment="center")
+        with photo:
+            if p.get("image_url"):
+                st.image(p["image_url"], alt=p["product"], width="stretch")
+                st.caption(f"Photo: [{SOURCE_NAME}]({p['image_source']})")
+            else:
+                with st.container(height=120, horizontal_alignment="center", vertical_alignment="center",
+                                  border=False):
+                    st.markdown(":gray[:material/image_not_supported:]  \n:gray[No photo]",
+                                text_alignment="center")
+        with text:
+            st.caption(step_["label"])
+            st.markdown(f"**{p['product']}**")
+            st.write(p["summary"])
+            if weekly:
+                st.caption(f"Use {step_['how_often']}.")
         with st.expander("Why this product"):
             if p["key_ingredients"]:
                 st.markdown("**Key ingredients for you**")

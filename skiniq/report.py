@@ -75,12 +75,30 @@ def _boxed(rows, widths, header=False) -> Table:
     return t
 
 
+PRODUCT_PHOTO_MM = 20
+
+
+def _product_photo(data: bytes | None, st: dict):
+    """A product photo scaled into a square cell, or a short 'no photo' note."""
+    if data:
+        try:
+            img = Image(io.BytesIO(data))
+            scale = PRODUCT_PHOTO_MM * mm / max(img.imageWidth, img.imageHeight)
+            img.drawWidth, img.drawHeight = img.imageWidth * scale, img.imageHeight * scale
+            return img
+        except Exception:  # not a readable image
+            pass
+    return Paragraph("No photo", st["small"])
+
+
 def _routine_part(title: str, steps: list[dict], st: dict, width: float, weekly: bool = False,
-                  lead: list | None = None) -> list:
+                  lead: list | None = None, photos: dict[str, bytes] | None = None) -> list:
     if not steps:
         return list(lead or [])
     out = [*(lead or []), Paragraph(_clean(title), st["h3"])]
-    rows = [[Paragraph("<b>Step</b>", st["cell"]), Paragraph("<b>Product and why</b>", st["cell"])]]
+    photos = photos or {}
+    rows = [[Paragraph("<b>Step</b>", st["cell"]), Paragraph("<b>Photo</b>", st["cell"]),
+             Paragraph("<b>Product and why</b>", st["cell"])]]
     for step in steps:
         p = step["product"]
         parts = [f"<b>{_clean(p['product'])}</b>", _clean(p["summary"])]
@@ -90,15 +108,24 @@ def _routine_part(title: str, steps: list[dict], st: dict, width: float, weekly:
             parts.append(f"<font color='#a0522d'>Caution: {_clean(caution)}</font>")
         if weekly and step.get("how_often"):
             parts.append(_clean(f"Use {step['how_often']}."))
-        rows.append([Paragraph(_clean(step["label"]), st["cell"]), Paragraph("<br/>".join(parts), st["cell"])])
-    table = _boxed(rows, [32 * mm, width - 32 * mm], header=True)
+        if p.get("image_source"):
+            parts.append(f"<font color='#6b6b6b' size='7.5'>Photo: INKEEDecoder</font>")
+        rows.append([Paragraph(_clean(step["label"]), st["cell"]), _product_photo(photos.get(p["product"]), st),
+                     Paragraph("<br/>".join(parts), st["cell"])])
+    photo_col = (PRODUCT_PHOTO_MM + 4) * mm
+    table = _boxed(rows, [28 * mm, photo_col, width - 28 * mm - photo_col], header=True)
     table.repeatRows = 1
     out.append(table)
     return [KeepTogether(out)]  # heading and table start on the same page
 
 
-def build_pdf(result: dict, photo: bytes | None = None, generated: datetime | None = None) -> bytes:
-    """Render the analysis result as a PDF and return its bytes."""
+def build_pdf(result: dict, photo: bytes | None = None, generated: datetime | None = None,
+              product_photos: dict[str, bytes] | None = None) -> bytes:
+    """Render the analysis result as a PDF and return its bytes.
+
+    `product_photos` maps a product title to its photo bytes (from INKEEDecoder); products
+    without one get a "No photo" cell.
+    """
     st = _styles()
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
@@ -170,10 +197,10 @@ def build_pdf(result: dict, photo: bytes | None = None, generated: datetime | No
 
     # Routine
     routine = result["routine"]
-    story += _routine_part("Morning", routine["morning"], st, width,
+    story += _routine_part("Morning", routine["morning"], st, width, photos=product_photos,
                            lead=[Paragraph("Your routine", st["h2"])])
-    story += _routine_part("Night", routine["evening"], st, width)
-    story += _routine_part("Weekly", routine["weekly"], st, width, weekly=True)
+    story += _routine_part("Night", routine["evening"], st, width, photos=product_photos)
+    story += _routine_part("Weekly", routine["weekly"], st, width, weekly=True, photos=product_photos)
     if routine["conflicts"]:
         story.append(Paragraph("Ingredient conflicts", st["h3"]))
         story.append(_bullets([f"{c['reason']}: {c['advice']} ({' + '.join(c['products'])})."
