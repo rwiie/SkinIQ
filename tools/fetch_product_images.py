@@ -44,7 +44,8 @@ _RESULT = re.compile(r'<a href="(/products/[^"]+)" class="klavika simpletextlist
 
 
 def normalise(text: str) -> str:
-    text = unicodedata.normalize("NFKD", html.unescape(text)).encode("ascii", "ignore").decode()
+    text = re.sub(r"[™®©]", " ", html.unescape(text))  # 'Ceramidin™' -> 'Ceramidin'
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     text = re.sub(r"['`]", "", text.lower())  # A'Pieu -> apieu
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
@@ -60,7 +61,7 @@ def slugify(text: str) -> str:
     return normalise(text).replace(" ", "-")
 
 
-_FILLER = {"with", "and", "the", "for", "of", "tm"}  # "tm" = the ™ sign
+_FILLER = {"with", "and", "the", "for", "of", "tm"}  # "tm": the ™ sign written out
 
 
 def _words(text: str) -> set[str]:
