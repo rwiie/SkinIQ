@@ -54,7 +54,7 @@ def test_full_result_has_the_four_sections_and_is_json(answers, selfie, kl_after
     assert [s["step"] for s in r["routine"]["morning"]] == ["cleanser", "toner", "treatment", "moisturizer",
                                                            "sunscreen"]
     assert [s["step"] for s in r["routine"]["evening"]] == ["cleanser", "toner", "treatment", "moisturizer"]
-    assert any("UV index is 10" in a for a in r["advice"])
+    assert any("UV peaks at 10" in a for a in r["advice"])
     assert r["notes"] == []
 
 

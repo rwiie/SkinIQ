@@ -63,9 +63,7 @@ def explain_skin_analysis(usce: USCE) -> dict:
 
     env = usce.environment
     if env:
-        bits = [f"{env.temperature_c:g} °C", f"{env.humidity_pct:g}% humidity",
-                f"UV index {env.uv_index:g} ({env.uv_level.replace('_', ' ')})"]
-        env_text = (f"Weather{' in ' + env.location if env.location else ''}: " + ", ".join(bits) + ".")
+        env_text = env.summary()
     else:
         env_text = "Weather data unavailable, so no environmental adjustments were made."
 
@@ -77,6 +75,8 @@ def explain_skin_analysis(usce: USCE) -> dict:
         "no_concerns_text": None if concerns else "No skin concerns were detected.",
         "sensitive": usce.is_sensitive,
         "environment_text": env_text,
+        "location": ({"place": env.location, "latitude": env.latitude, "longitude": env.longitude,
+                      "weather_source": env.source} if env else None),
         "photo_used": usce.has_photo,
     }
 
@@ -88,7 +88,7 @@ def personalised_advice(usce: USCE) -> list[str]:
     tips = []
     flags = usce.env_flags
     if flags.get("high_uv"):
-        tips.append(f"The UV index is {usce.environment.uv_index:g}: apply sunscreen every morning and reapply "
+        tips.append(f"UV peaks at {usce.environment.uv_peak:g} today: apply sunscreen every morning and reapply "
                     "every 2 hours outdoors.")
     else:
         tips.append("Use sunscreen every morning, even on cloudy days.")

@@ -11,12 +11,11 @@ compatibility checks -> explanations (3.6.5). The photo and the weather are opti
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
 
-from skiniq.config import MODELS_DIR
+from skiniq.vision.weights import SKIN_CONCERN_MODEL
 from skiniq.environment import EnvironmentData
 from skiniq.explain import DISCLAIMER, STEP_LABELS, explain_product, explain_skin_analysis, personalised_advice
 from skiniq.fusion import USCE, ImageAnalysis, build_usce
@@ -24,7 +23,6 @@ from skiniq.products import Product
 from skiniq.recommender import Recommendation, rank_products
 from skiniq.rules import check_routine
 
-SKIN_CONCERN_MODEL = MODELS_DIR / "skin_concerns" / "model.pt"
 CANDIDATES_PER_STEP = 8
 ALTERNATIVES = 2
 MORNING = ("cleanser", "toner", "treatment", "moisturizer", "sunscreen")
@@ -32,14 +30,35 @@ EVENING = ("cleanser", "toner", "treatment", "moisturizer")
 PHOTOSENSITISING = ("retinoid", "aha")
 
 
-@lru_cache(maxsize=1)
-def load_classifier(path: str | Path = SKIN_CONCERN_MODEL):
-    """The multi-label skin concern model, or None if the weights are not available."""
-    if not Path(path).exists():
-        return None
-    from skiniq.vision.model import SkinClassifier
+_CLASSIFIERS: dict[str, object] = {}
+LAST_MODEL_ERROR: list[str] = []  # reason the model could not be loaded (for the app's note)
 
-    return SkinClassifier.load(path)
+
+def load_classifier(path: str | Path | None = None, download: bool = True):
+    """The multi-label skin concern model, downloading the weights on first use.
+
+    Returns None (and records the reason in LAST_MODEL_ERROR) if the weights are missing
+    and cannot be downloaded. Successful loads are cached; failures are retried next time.
+    """
+    path = SKIN_CONCERN_MODEL if path is None else path
+    key = str(path)
+    if key in _CLASSIFIERS:
+        return _CLASSIFIERS[key]
+    from skiniq.vision.weights import ModelUnavailable, ensure_model
+
+    LAST_MODEL_ERROR.clear()
+    try:
+        if download and Path(path) == SKIN_CONCERN_MODEL:
+            ensure_model(Path(path))
+        if not Path(path).exists():
+            raise ModelUnavailable(f"model file not found at {path}")
+        from skiniq.vision.model import SkinClassifier
+
+        _CLASSIFIERS[key] = SkinClassifier.load(path)
+    except ModelUnavailable as e:
+        LAST_MODEL_ERROR.append(str(e))
+        return None
+    return _CLASSIFIERS[key]
 
 
 def analyse_image(image: Image.Image, classifier) -> ImageAnalysis:
@@ -118,7 +137,8 @@ def analyse(answers: dict, image: Image.Image | None = None, environment: Enviro
     if image is not None:
         classifier = classifier or load_classifier()
         if classifier is None:
-            notes.append("The photo could not be analysed (model not available); results use your answers only.")
+            reason = f" ({LAST_MODEL_ERROR[0]})" if LAST_MODEL_ERROR else ""
+            notes.append(f"The photo could not be analysed{reason}; results use your answers only.")
         else:
             image_analysis = analyse_image(image, classifier)
     if environment is None:

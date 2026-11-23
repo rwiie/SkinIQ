@@ -226,3 +226,10 @@ def test_locations_reach_the_concern(answers):
     usce = build_usce(answers(), img)
     assert usce.concerns["blackheads"].locations == ["nose", "chin"]
     assert usce.to_dict()["concerns"]["blackheads"]["locations"] == ["nose", "chin"]
+
+
+def test_photo_detection_below_possible_level_still_names_the_photo(answers):
+    thresholds = {c: 0.5 for c in SKIN_CONDITIONS} | {"blackheads": 0.15}
+    img = ImageAnalysis(conditions=multi(blackheads=0.17), independent=True, thresholds=thresholds)
+    c = build_usce(answers(), img).concerns["blackheads"]
+    assert c.status == "detected" and c.sources == ["photo"]

@@ -4,7 +4,9 @@ import json
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
 
-from app.services import get_classifier, get_product_index, get_weather
+from app.components.camera import face_camera
+from app.components.geolocation import detect_location
+from app.services import get_classifier, get_product_index, get_weather_at, photo_quality
 from skiniq.environment import WeatherError
 from skiniq.pipeline import analyse
 from skiniq.questionnaire import QUESTIONS
@@ -17,7 +19,8 @@ if "result" not in st.session_state:
     st.session_state.photo_bytes = None
 
 st.title("Analyse my skin")
-st.caption("Answer a few questions, add a photo and your location to get a personalised Korean skincare routine.")
+st.caption("Add a photo and answer a few questions to get a personalised Korean skincare routine. "
+           "Your location is detected automatically for today's weather.")
 
 # ---- 1. Photo ------------------------------------------------------------------------------
 st.subheader("1. Your photo")
@@ -25,14 +28,32 @@ source = st.segmented_control(
     "Photo", ["Upload a photo", "Take a photo", "Skip"], default="Upload a photo", key="photo_source",
     label_visibility="collapsed",
 )
-photo = None
+photo_bytes = None
 if source == "Upload a photo":
-    photo = st.file_uploader("Face photo (front-facing, no makeup or filters, good light)",
-                             type=["jpg", "jpeg", "png", "webp"], key="photo_upload")
+    upload = st.file_uploader("Face photo (front-facing, no makeup or filters, good light)",
+                              type=["jpg", "jpeg", "png", "webp"], key="photo_upload")
+    photo_bytes = upload.getvalue() if upload is not None else None
 elif source == "Take a photo":
-    photo = st.camera_input("Take a front-facing photo in good light", key="photo_camera")
+    st.caption("Fit your face inside the outline. It turns green when your face is detected and positioned well.")
+    photo_bytes = face_camera(key="face_camera")
 else:
     st.caption("Without a photo, your skin concerns come from your answers only.")
+
+# Reject unreadable, low-quality or face-less photos right away
+image = None
+if photo_bytes:
+    try:
+        image = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+    except UnidentifiedImageError:
+        st.error("That file isn't a readable image. Upload a JPG, PNG or WEBP photo.",
+                 title="Photo not accepted", icon=":material/no_photography:")
+    else:
+        report = photo_quality(photo_bytes)
+        if report.ok:
+            st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
+        else:
+            st.error(report.message, title="Photo not accepted", icon=":material/no_photography:")
+            image = None
 
 
 # ---- 2. Questionnaire + 3. Location (one form, submitted together) --------------------------
@@ -47,6 +68,11 @@ def question_widget(q):
     return st.radio(label, list(labels), index=None, format_func=labels.get, key=key)
 
 
+# ---- Location (automatic) ----------------------------------------------------------------------
+st.subheader("Your location")
+location = detect_location(key="geo")
+
+
 with st.form("questionnaire", border=False):
     st.subheader("2. About your skin")
     answers = {}
@@ -56,9 +82,6 @@ with st.form("questionnaire", border=False):
             for q in (q for q in QUESTIONS if q.section == section):
                 answers[q.id] = question_widget(q)
 
-    st.subheader("3. Your location")
-    place = st.text_input("City or town", value="Shah Alam", key="place",
-                          help="Used for today's temperature, humidity and UV index.")
     submitted = st.form_submit_button("Analyse my skin", type="primary", icon=":material/search:",
                                       width="stretch")
 
@@ -68,18 +91,17 @@ if submitted:
         st.error("Please answer question" + ("s " if len(missing) > 1 else " ") + ", ".join(missing) + ".",
                  title="Some answers are missing")
     else:
-        image = None
-        if photo is not None:
-            try:
-                image = Image.open(io.BytesIO(photo.getvalue())).convert("RGB")
-            except UnidentifiedImageError:
-                st.warning("That file isn't a readable image, so the photo was skipped.")
         environment = None
         weather_error = None
-        try:
-            environment = get_weather(place)
-        except WeatherError as e:
-            weather_error = str(e)
+        if location and location.get("status") == "ok":
+            try:
+                environment = get_weather_at(location["lat"], location["lon"], location.get("place") or None)
+            except WeatherError as e:
+                weather_error = str(e)
+        elif location:
+            weather_error = "location access was not available"
+        else:
+            weather_error = "your location is still being detected"
         with st.spinner("Analysing your skin and choosing products…"):
             get_product_index()
             result = analyse({**answers, "known_conditions": answers["known_conditions"] or ["none"],
@@ -91,7 +113,7 @@ if submitted:
             result["notes"] = [n for n in result["notes"] if not n.startswith("Weather data")]
             result["notes"].insert(0, f"Weather unavailable ({weather_error}), so no weather adjustments were made.")
         st.session_state.result = result
-        st.session_state.photo_bytes = photo.getvalue() if image is not None else None
+        st.session_state.photo_bytes = photo_bytes if image is not None else None
 
 # ---- Results ----------------------------------------------------------------------------------
 result = st.session_state.result
@@ -123,7 +145,25 @@ with st.container(border=True):
             st.markdown(f"{badge} {c['text'].split(': ', 1)[1]}")
     else:
         st.markdown(":green-badge[Clear] " + sa["no_concerns_text"])
-    st.caption(sa["environment_text"])
+
+    env = result["usce"]["environment"]
+    st.markdown("**Your location and today's weather**")
+    if env:
+        coords = f"{env['latitude']:.4f}, {env['longitude']:.4f}" if env.get("latitude") is not None else ""
+        named = coords and not env["location"].endswith(("E", "W"))  # a place name, not just coordinates
+        st.markdown(f":material/location_on: {env['location']}" + (f"  \n:gray[{coords}]" if named else ""))
+        with st.container(horizontal=True):
+            st.metric("Avg temperature", f"{env['temperature_c']:g} °C", border=True)
+            st.metric("Avg humidity", f"{env['humidity_pct']:g}%", border=True)
+            if env.get("uv_index") is not None:
+                st.metric("Avg UV index", f"{env['uv_index']:g}", border=True,
+                          help="Average over daylight hours today.")
+            if env.get("uv_max") is not None:
+                st.metric("Peak UV index", f"{env['uv_max']:g}", border=True,
+                          help="Today's maximum. Sun-protection advice uses the peak (WHO UV Index).")
+        st.caption(sa["environment_text"] + (f" Source: {env['source']}." if env.get("source") else ""))
+    else:
+        st.caption(sa["environment_text"])
 
 # Section 2: advice
 st.subheader("Advice for you")

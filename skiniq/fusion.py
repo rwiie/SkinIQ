@@ -152,7 +152,7 @@ class USCE:
             *(float(a in self.avoid_ingredients) for a in AVOIDABLE),
             _clip01(env.temperature_c / 40) if env else 0.0,
             env.humidity_pct / 100 if env else 0.0,
-            _clip01(env.uv_index / 11) if env else 0.0,
+            _clip01(env.uv_peak / 11) if env and env.uv_peak is not None else 0.0,
             *(float(self.env_flags[f]) for f in ENV_FLAGS),
             float(env is not None),
         ]
@@ -208,7 +208,9 @@ def build_usce(
         photo = image.conditions[c] if image else None
         score = max(photo or 0.0, self_reported[c])
         sources = []
-        if photo is not None and photo >= CONDITION_POSSIBLE_THRESHOLD:
+        # the photo counts as evidence from the lower of the "possible" level and the model's own
+        # (tuned) detection threshold, so every photo detection names its source
+        if photo is not None and photo >= min(CONDITION_POSSIBLE_THRESHOLD, image.threshold(c)):
             sources.append("photo")
         if self_reported[c] >= CONDITION_POSSIBLE_THRESHOLD:
             sources.append("questionnaire")

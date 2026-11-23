@@ -19,8 +19,9 @@ RULES: list[Rule] = [
          matches=lambda p, u: p.step == "sunscreen",
          action=Action.PREFER, weight=0.3,
          source="WHO (2002) Global Solar UV Index; Abhishek et al. (2023)",
-         reason=lambda p, u: (f"UV index is {u.environment.uv_index:g} ({u.environment.uv_level.replace('_', ' ')}): "
-                              "daily sunscreen is essential") if u.environment else "Protects against UV damage"),
+         reason=lambda p, u: (f"UV index peaks at {u.environment.uv_peak:g} today ({u.environment.uv_level.replace('_', ' ')}): "
+                              "daily sunscreen is essential")
+         if u.environment and u.environment.uv_peak is not None else "Protects against UV damage"),
     Rule("E1_uv_photosensitising", KB, "High UV -> caution for retinoids and AHAs (increase sun sensitivity)",
          applies=lambda u: _flag(u, "high_uv"),
          matches=lambda p, u: p.has("retinoid") or p.has("aha"),

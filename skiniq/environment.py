@@ -1,138 +1,202 @@
-"""Environmental context: temperature, humidity and UV index (proposal 3.4, 3.6.2).
+"""Environmental context: today's average temperature, humidity and UV index at the
+user's exact location (proposal 3.4, 3.6.2, 3.7).
 
-`EnvironmentData` is what the fusion layer uses. The OpenWeatherMap client that
-fills it from the user's location is added with the Streamlit prototype (step 8).
+The browser supplies the device's GPS / Wi-Fi position (latitude, longitude); weather
+for that point is fetched from Open-Meteo (free, no key) as today's hourly forecast,
+averaged over the local day. OpenWeatherMap (with an API key) is the fallback for
+temperature and humidity; its free plan has no UV index.
+
+UV: the average over daylight hours is reported as asked, and the day's peak is kept
+too. Sun-protection rules use the peak, because the WHO UV Index categories describe the
+day's maximum exposure: in Malaysia the daylight average is often ~4 ("moderate") on a
+day that peaks at 10 ("very high").
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+import requests
 
 from skiniq.config import COLD_C, DRY_AIR_PCT, HOT_C, HUMID_PCT, UV_HIGH, UV_MODERATE
 
 
+def uv_category(uv: float) -> str:
+    """WHO UV Index category."""
+    if uv < UV_MODERATE:
+        return "low"
+    if uv < UV_HIGH:
+        return "moderate"
+    if uv < 8:
+        return "high"
+    if uv < 11:
+        return "very_high"
+    return "extreme"
+
+
 @dataclass(frozen=True)
 class EnvironmentData:
-    temperature_c: float
-    humidity_pct: float
-    uv_index: float
+    temperature_c: float                # today's average
+    humidity_pct: float                 # today's average relative humidity
+    uv_index: float | None              # today's average over daylight hours (None if unavailable)
     location: str = ""
+    uv_max: float | None = None         # today's peak UV
+    latitude: float | None = None
+    longitude: float | None = None
+    source: str = ""
 
     def __post_init__(self) -> None:
         if not 0 <= self.humidity_pct <= 100:
             raise ValueError(f"humidity must be 0-100%, got {self.humidity_pct}")
-        if self.uv_index < 0:
-            raise ValueError(f"UV index cannot be negative, got {self.uv_index}")
+        for name in ("uv_index", "uv_max"):
+            v = getattr(self, name)
+            if v is not None and v < 0:
+                raise ValueError(f"UV index cannot be negative, got {v}")
 
     @property
-    def uv_level(self) -> str:
-        """WHO UV Index category."""
-        uv = self.uv_index
-        if uv < UV_MODERATE:
-            return "low"
-        if uv < UV_HIGH:
-            return "moderate"
-        if uv < 8:
-            return "high"
-        if uv < 11:
-            return "very_high"
-        return "extreme"
+    def uv_peak(self) -> float | None:
+        """UV used for sun-protection decisions: the day's peak, else the given value."""
+        return self.uv_max if self.uv_max is not None else self.uv_index
+
+    @property
+    def uv_level(self) -> str | None:
+        return uv_category(self.uv_peak) if self.uv_peak is not None else None
 
     @property
     def flags(self) -> dict[str, bool]:
         return {
-            "high_uv": self.uv_index >= UV_HIGH,
+            "high_uv": self.uv_peak is not None and self.uv_peak >= UV_HIGH,
             "humid": self.humidity_pct >= HUMID_PCT,
             "dry_air": self.humidity_pct < DRY_AIR_PCT,
             "hot": self.temperature_c >= HOT_C,
             "cold": self.temperature_c < COLD_C,
         }
 
+    def summary(self) -> str:
+        """One line for the results page."""
+        where = f" in {self.location}" if self.location else ""
+        bits = [f"{self.temperature_c:g} °C", f"{self.humidity_pct:g}% humidity"]
+        if self.uv_index is not None and self.uv_max is not None:
+            bits.append(f"UV index {self.uv_index:g} on average, peaking at {self.uv_max:g} "
+                        f"({self.uv_level.replace('_', ' ')})")
+        elif self.uv_peak is not None:
+            bits.append(f"UV index {self.uv_peak:g} ({self.uv_level.replace('_', ' ')})")
+        else:
+            bits.append("UV index unavailable")
+        return f"Today's average{where}: " + ", ".join(bits) + "."
 
-# ---- live weather (proposal 3.7) ----------------------------------------------------------
-#
-# OpenWeatherMap (proposal) gives location, temperature and humidity on its free plan, but
-# the UV index needs its paid One Call API, so UV comes from Open-Meteo (free, no key).
-# Without an OpenWeatherMap key, Open-Meteo provides everything.
 
-import requests  # noqa: E402
+# ---- live weather by coordinates ----------------------------------------------------------
 
-OWM_GEOCODE = "https://api.openweathermap.org/geo/1.0/direct"
-OWM_WEATHER = "https://api.openweathermap.org/data/2.5/weather"
-OPEN_METEO_GEOCODE = "https://geocoding-api.open-meteo.com/v1/search"
 OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
+OWM_FORECAST = "https://api.openweathermap.org/data/2.5/forecast"
+OWM_REVERSE = "https://api.openweathermap.org/geo/1.0/reverse"
 TIMEOUT_S = 8
-
-
-class WeatherError(RuntimeError):
-    """Weather could not be fetched (unknown place, network or API problem)."""
-
-
 RETRIES = 1  # one retry for timeouts and rate limits (HTTP 429)
 
 
+class WeatherError(RuntimeError):
+    """Weather could not be fetched (network or API problem)."""
+
+
 def _get(url: str, params: dict) -> dict | list:
+    resp = None
     for attempt in range(RETRIES + 1):
         try:
             resp = requests.get(url, params=params, timeout=TIMEOUT_S)
         except requests.RequestException as e:
             if attempt < RETRIES:
                 continue
-            raise WeatherError(f"Weather service unreachable ({type(e).__name__})") from None
+            raise WeatherError(f"weather service unreachable ({type(e).__name__})") from None
         if resp.status_code == 429 and attempt < RETRIES:
             continue
         break
     if resp.status_code == 401:
         raise WeatherError("OpenWeatherMap rejected the API key (new keys can take a few hours to activate)")
+    if resp.status_code == 429:
+        raise WeatherError("weather service rate limit reached; try again later")
     if resp.status_code != 200:
-        raise WeatherError(f"Weather service returned HTTP {resp.status_code}")
+        raise WeatherError(f"weather service returned HTTP {resp.status_code}")
     return resp.json()
 
 
-def _open_meteo_place(place: str) -> tuple[float, float, str]:
-    data = _get(OPEN_METEO_GEOCODE, {"name": place, "count": 1})
-    results = data.get("results") or []
-    if not results:
-        raise WeatherError(f"Place not found: {place!r}")
-    r = results[0]
-    name = ", ".join(x for x in (r.get("name"), r.get("country")) if x)
-    return r["latitude"], r["longitude"], name
+def _mean(values) -> float | None:
+    vals = [float(v) for v in values if v is not None]
+    return sum(vals) / len(vals) if vals else None
 
 
-def _open_meteo_current(lat: float, lon: float) -> dict:
-    data = _get(OPEN_METEO_FORECAST, {"latitude": lat, "longitude": lon, "timezone": "auto",
-                                      "current": "temperature_2m,relative_humidity_2m,uv_index",
-                                      "daily": "uv_index_max", "forecast_days": 1})
-    current = data.get("current") or {}
-    daily = (data.get("daily") or {}).get("uv_index_max") or [None]
-    return {"temperature_c": current.get("temperature_2m"), "humidity_pct": current.get("relative_humidity_2m"),
-            "uv_now": current.get("uv_index"), "uv_max_today": daily[0]}
+def _open_meteo_today(lat: float, lon: float) -> dict:
+    data = _get(OPEN_METEO_FORECAST, {
+        "latitude": lat, "longitude": lon, "timezone": "auto", "forecast_days": 1,
+        "hourly": "temperature_2m,relative_humidity_2m,uv_index", "daily": "uv_index_max",
+    })
+    hourly = data.get("hourly") or {}
+    uv_hours = [v for v in hourly.get("uv_index") or [] if v is not None]
+    daylight = [v for v in uv_hours if v > 0]
+    peak = ((data.get("daily") or {}).get("uv_index_max") or [None])[0]
+    temp = _mean(hourly.get("temperature_2m") or [])
+    humidity = _mean(hourly.get("relative_humidity_2m") or [])
+    if temp is None or humidity is None:
+        raise WeatherError("weather service returned incomplete data")
+    return {"temperature_c": temp, "humidity_pct": humidity,
+            "uv_index": _mean(daylight) if daylight else (0.0 if uv_hours else None),
+            "uv_max": peak if peak is not None else (max(uv_hours) if uv_hours else None)}
 
 
-def fetch_weather(place: str, api_key: str | None = None) -> EnvironmentData:
-    """Current weather for a place name (e.g. "Shah Alam").
+def _owm_today(lat: float, lon: float, api_key: str) -> dict:
+    """Free OpenWeatherMap 5-day / 3-hour forecast, averaged over the local calendar day."""
+    data = _get(OWM_FORECAST, {"lat": lat, "lon": lon, "units": "metric", "appid": api_key})
+    offset = timedelta(seconds=(data.get("city") or {}).get("timezone", 0))
+    today = (datetime.now(timezone.utc) + offset).date()
+    items = [i for i in data.get("list", []) if (datetime.fromtimestamp(i["dt"], timezone.utc) + offset).date() == today]
+    items = items or data.get("list", [])[:8]  # late evening: next 24 h
+    temp = _mean(i["main"]["temp"] for i in items)
+    humidity = _mean(i["main"]["humidity"] for i in items)
+    if temp is None or humidity is None:
+        raise WeatherError("OpenWeatherMap returned incomplete data")
+    return {"temperature_c": temp, "humidity_pct": humidity, "uv_index": None, "uv_max": None}
 
-    The UV index used is today's maximum, which is what a morning routine should plan
-    for (current UV is 0 at night). Raises WeatherError on failure.
-    """
-    place = (place or "").strip()
-    if not place:
-        raise WeatherError("No location given")
-    if api_key:
-        found = _get(OWM_GEOCODE, {"q": place, "limit": 1, "appid": api_key})
-        if not found:
-            raise WeatherError(f"Place not found: {place!r}")
-        lat, lon = found[0]["lat"], found[0]["lon"]
-        w = _get(OWM_WEATHER, {"lat": lat, "lon": lon, "units": "metric", "appid": api_key})
-        temp, humidity = w["main"]["temp"], w["main"]["humidity"]
-        name = ", ".join(x for x in (w.get("name") or found[0].get("name"), found[0].get("country")) if x)
-        uv = _open_meteo_current(lat, lon)
-    else:
-        lat, lon, name = _open_meteo_place(place)
-        uv = _open_meteo_current(lat, lon)
-        temp, humidity = uv["temperature_c"], uv["humidity_pct"]
-    uv_index = uv["uv_max_today"] if uv["uv_max_today"] is not None else uv["uv_now"]
-    if temp is None or humidity is None or uv_index is None:
-        raise WeatherError("Weather service returned incomplete data")
-    return EnvironmentData(temperature_c=round(float(temp), 1), humidity_pct=float(humidity),
-                           uv_index=round(float(uv_index), 1), location=name)
+
+def _owm_place(lat: float, lon: float, api_key: str) -> str:
+    try:
+        found = _get(OWM_REVERSE, {"lat": lat, "lon": lon, "limit": 1, "appid": api_key})
+    except WeatherError:
+        return ""
+    if not found:
+        return ""
+    f = found[0]
+    return ", ".join(x for x in (f.get("name"), f.get("state"), f.get("country")) if x)
+
+
+def coordinates_label(lat: float, lon: float) -> str:
+    return f"{abs(lat):.4f}° {'N' if lat >= 0 else 'S'}, {abs(lon):.4f}° {'E' if lon >= 0 else 'W'}"
+
+
+def fetch_weather_at(lat: float, lon: float, place: str | None = None, api_key: str | None = None
+                     ) -> EnvironmentData:
+    """Today's average weather at a point. `place` is a name for display (e.g. from the
+    browser's reverse geocoding). Raises WeatherError if no source works."""
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise WeatherError("invalid coordinates")
+    errors = []
+    w = source = None
+    try:
+        w, source = _open_meteo_today(lat, lon), "Open-Meteo"
+    except WeatherError as e:
+        errors.append(f"Open-Meteo: {e}")
+        if api_key:
+            try:
+                w, source = _owm_today(lat, lon, api_key), "OpenWeatherMap (UV unavailable)"
+            except WeatherError as e2:
+                errors.append(f"OpenWeatherMap: {e2}")
+    if w is None:
+        raise WeatherError("; ".join(errors))
+    name = place or (_owm_place(lat, lon, api_key) if api_key else "") or coordinates_label(lat, lon)
+
+    def r(v):
+        return None if v is None else round(float(v), 1)
+
+    return EnvironmentData(temperature_c=r(w["temperature_c"]), humidity_pct=round(float(w["humidity_pct"])),
+                           uv_index=r(w["uv_index"]), location=name, uv_max=r(w["uv_max"]),
+                           latitude=round(lat, 5), longitude=round(lon, 5), source=source)

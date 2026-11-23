@@ -1,10 +1,12 @@
-"""Live weather client, with HTTP mocked."""
+"""Live weather at the user's coordinates (daily averages), with HTTP mocked."""
 
 import pytest
 import requests
 
 from skiniq import environment as env
-from skiniq.environment import WeatherError, fetch_weather
+from skiniq.environment import EnvironmentData, WeatherError, coordinates_label, fetch_weather_at
+
+SHAH_ALAM = (3.0733, 101.5185)
 
 
 class Resp:
@@ -15,98 +17,103 @@ class Resp:
         return self._data
 
 
-def router(routes, calls):
+def router(routes, calls=None):
     def fake_get(url, params=None, timeout=None):
-        calls.append((url, params))
+        if calls is not None:
+            calls.append((url, params))
         for prefix, resp in routes.items():
             if url.startswith(prefix):
-                return resp
+                return resp() if callable(resp) else resp
         raise AssertionError(f"unexpected URL {url}")
     return fake_get
 
 
-METEO = Resp({"current": {"temperature_2m": 31.4, "relative_humidity_2m": 76, "uv_index": 0.0},
-              "daily": {"uv_index_max": [10.25]}})
+# 24 hourly values for one local day: night UV 0, daylight 07:00-18:00
+TEMPS = [25.0] * 12 + [31.0] * 12            # mean 28.0
+HUMIDITY = [90] * 12 + [70] * 12             # mean 80
+UV = [0] * 7 + [1, 2, 4, 6, 8, 10, 10, 8, 6, 4, 2, 1] + [0] * 5   # daylight mean 5.17, peak 10
+METEO = Resp({"hourly": {"temperature_2m": TEMPS, "relative_humidity_2m": HUMIDITY, "uv_index": UV},
+              "daily": {"uv_index_max": [10.2]}})
 
 
-def test_open_meteo_only_without_key(monkeypatch):
+def test_daily_averages_at_coordinates(monkeypatch):
     calls = []
+    monkeypatch.setattr(requests, "get", router({env.OPEN_METEO_FORECAST: METEO}, calls))
+    w = fetch_weather_at(*SHAH_ALAM, place="Seksyen 13, Shah Alam")
+    assert (w.temperature_c, w.humidity_pct) == (28.0, 80)
+    assert w.uv_index == 5.2 and w.uv_max == 10.2           # daylight average, peak
+    assert (w.latitude, w.longitude, w.location) == (3.0733, 101.5185, "Seksyen 13, Shah Alam")
+    params = calls[0][1]
+    assert params["latitude"] == 3.0733 and params["timezone"] == "auto" and params["forecast_days"] == 1
+
+
+def test_summary_line_shows_average_and_peak(monkeypatch):
+    monkeypatch.setattr(requests, "get", router({env.OPEN_METEO_FORECAST: METEO}))
+    text = fetch_weather_at(*SHAH_ALAM, place="Seksyen 13, Shah Alam").summary()
+    assert text == ("Today's average in Seksyen 13, Shah Alam: 28 °C, 80% humidity, "
+                    "UV index 5.2 on average, peaking at 10.2 (very high).")
+
+
+def test_without_place_name_shows_coordinates(monkeypatch):
+    monkeypatch.setattr(requests, "get", router({env.OPEN_METEO_FORECAST: METEO}))
+    assert fetch_weather_at(*SHAH_ALAM).location == "3.0733° N, 101.5185° E"
+    assert coordinates_label(-33.8688, -151.2093) == "33.8688° S, 151.2093° W"
+
+
+def test_owm_fallback_averages_today_and_reverse_geocodes(monkeypatch):
+    import time
+
+    now = int(time.time())
+    owm = Resp({"city": {"timezone": 0},
+                "list": [{"dt": now, "main": {"temp": 30.0, "humidity": 70}},
+                         {"dt": now + 1, "main": {"temp": 26.0, "humidity": 90}}]})
     monkeypatch.setattr(requests, "get", router({
-        env.OPEN_METEO_GEOCODE: Resp({"results": [{"name": "Shah Alam", "country": "Malaysia",
-                                                   "latitude": 3.07, "longitude": 101.52}]}),
-        env.OPEN_METEO_FORECAST: METEO,
-    }, calls))
-    w = fetch_weather("Shah Alam")
-    assert (w.temperature_c, w.humidity_pct, w.uv_index, w.location) == (31.4, 76.0, 10.2, "Shah Alam, Malaysia")
-    assert not any("openweathermap" in u for u, _ in calls)
+        env.OPEN_METEO_FORECAST: Resp({}, status=429),
+        env.OWM_FORECAST: owm,
+        env.OWM_REVERSE: Resp([{"name": "Shah Alam", "state": "Selangor", "country": "MY"}]),
+    }))
+    w = fetch_weather_at(*SHAH_ALAM, api_key="KEY")
+    assert (w.temperature_c, w.humidity_pct, w.uv_index, w.uv_max) == (28.0, 80, None, None)
+    assert w.location == "Shah Alam, Selangor, MY" and "OpenWeatherMap" in w.source
+    assert w.summary().endswith("UV index unavailable.")
 
 
-def test_openweathermap_with_key_and_uv_from_open_meteo(monkeypatch):
-    calls = []
-    monkeypatch.setattr(requests, "get", router({
-        env.OWM_GEOCODE: Resp([{"name": "Shah Alam", "country": "MY", "lat": 3.07, "lon": 101.52}]),
-        env.OWM_WEATHER: Resp({"name": "Shah Alam", "main": {"temp": 32.0, "humidity": 78}}),
-        env.OPEN_METEO_FORECAST: METEO,
-    }, calls))
-    w = fetch_weather("Shah Alam", api_key="KEY")
-    assert (w.temperature_c, w.humidity_pct, w.uv_index) == (32.0, 78.0, 10.2)
-    owm = [p for u, p in calls if "openweathermap" in u]
-    assert owm and all(p["appid"] == "KEY" for p in owm)
-    assert any(u == env.OPEN_METEO_FORECAST for u, _ in calls)
-
-
-def test_uv_uses_today_max_not_current(monkeypatch):
-    monkeypatch.setattr(requests, "get", router({
-        env.OPEN_METEO_GEOCODE: Resp({"results": [{"name": "X", "latitude": 0, "longitude": 0}]}),
-        env.OPEN_METEO_FORECAST: Resp({"current": {"temperature_2m": 25, "relative_humidity_2m": 50,
-                                                   "uv_index": 0.0}, "daily": {"uv_index_max": [7.0]}}),
-    }, []))
-    assert fetch_weather("X").uv_index == 7.0
-
-
-@pytest.mark.parametrize("routes, message", [
-    ({env.OPEN_METEO_GEOCODE: Resp({"results": []})}, "Place not found"),
-    ({env.OPEN_METEO_GEOCODE: Resp({}, status=500)}, "HTTP 500"),
-])
-def test_errors_are_reported_clearly(monkeypatch, routes, message):
-    monkeypatch.setattr(requests, "get", router(routes, []))
-    with pytest.raises(WeatherError, match=message):
-        fetch_weather("Nowhere")
-
-
-def test_bad_key_message(monkeypatch):
-    monkeypatch.setattr(requests, "get", router({env.OWM_GEOCODE: Resp({}, status=401)}, []))
-    with pytest.raises(WeatherError, match="rejected the API key"):
-        fetch_weather("Shah Alam", api_key="bad")
-
-
-def test_network_failure(monkeypatch):
-    def boom(*a, **k):
-        raise requests.ConnectionError("down")
-    monkeypatch.setattr(requests, "get", boom)
-    with pytest.raises(WeatherError, match="unreachable"):
-        fetch_weather("Shah Alam")
-
-
-def test_empty_place():
-    with pytest.raises(WeatherError, match="No location"):
-        fetch_weather("  ")
+def test_all_sources_failing_raises_with_reasons(monkeypatch):
+    monkeypatch.setattr(requests, "get", router({env.OPEN_METEO_FORECAST: Resp({}, status=500),
+                                                 env.OWM_FORECAST: Resp({}, status=401)}))
+    with pytest.raises(WeatherError, match="Open-Meteo.*HTTP 500.*rejected the API key"):
+        fetch_weather_at(*SHAH_ALAM, api_key="bad")
 
 
 def test_one_retry_after_rate_limit(monkeypatch):
-    responses = iter([Resp({}, status=429),
-                      Resp({"results": [{"name": "X", "latitude": 0, "longitude": 0}]}), METEO])
+    responses = iter([Resp({}, status=429), METEO])
     monkeypatch.setattr(requests, "get", lambda *a, **k: next(responses))
-    assert fetch_weather("X").uv_index == 10.2
+    assert fetch_weather_at(*SHAH_ALAM).uv_max == 10.2
 
 
-def test_retry_after_timeout_then_gives_up(monkeypatch):
+def test_rate_limit_twice_is_reported(monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *a, **k: Resp({}, status=429))
+    with pytest.raises(WeatherError, match="rate limit"):
+        fetch_weather_at(*SHAH_ALAM)
+
+
+def test_network_failure_retries_once_then_gives_up(monkeypatch):
     calls = []
 
-    def slow(*a, **k):
+    def boom(*a, **k):
         calls.append(1)
-        raise requests.Timeout()
-    monkeypatch.setattr(requests, "get", slow)
+        raise requests.ConnectionError("down")
+    monkeypatch.setattr(requests, "get", boom)
     with pytest.raises(WeatherError, match="unreachable"):
-        fetch_weather("X")
+        fetch_weather_at(*SHAH_ALAM)
     assert len(calls) == 2
+
+
+def test_invalid_coordinates():
+    with pytest.raises(WeatherError, match="invalid"):
+        fetch_weather_at(120, 10)
+
+
+def test_environment_backwards_compatible_with_single_uv():
+    e = EnvironmentData(30, 80, 9)
+    assert e.uv_peak == 9 and e.flags["high_uv"] and e.summary().endswith("UV index 9 (very high).")

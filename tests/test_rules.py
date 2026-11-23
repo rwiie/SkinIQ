@@ -261,7 +261,7 @@ def test_every_rule_has_a_source():
 
 def test_high_uv_prefers_sunscreen_with_uv_in_reason(user, kl_afternoon):
     f = fired(user(environment=kl_afternoon), product(step="sunscreen"), "E1_uv_sunscreen")
-    assert f.action is Action.PREFER and "UV index is 10" in f.reason
+    assert f.action is Action.PREFER and "UV index peaks at 10" in f.reason
 
 
 def test_sun_protection_goal_prefers_sunscreen_without_weather(user):
@@ -337,3 +337,17 @@ def test_every_rule_is_tested():
     """Runs last in this file: every rule must have been fired by a test above."""
     untested = {r.id for r in ALL_RULES} - TESTED
     assert not untested, f"Rules without a test: {sorted(untested)}"
+
+
+def test_sun_rules_use_peak_uv_not_daily_average(user):
+    # Typical Malaysian day: average UV over daylight ~4 (moderate), peak 10 (very high)
+    env = EnvironmentData(28, 80, uv_index=4.1, uv_max=10.0)
+    assert env.flags["high_uv"] and env.uv_level == "very_high"
+    f = fired(user(environment=env), product(step="sunscreen"), "E1_uv_sunscreen")
+    assert f is not None and "peaks at 10" in f.reason
+
+
+def test_missing_uv_turns_off_sun_rules(user):
+    env = EnvironmentData(28, 80, uv_index=None)
+    assert env.flags["high_uv"] is False and env.uv_level is None
+    assert fired(user(environment=env), product("Glycolic Acid"), "E1_uv_photosensitising") is None

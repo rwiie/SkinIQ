@@ -11,11 +11,13 @@ pip install -r requirements.txt
 streamlit run app/streamlit_app.py
 ```
 
-1. **Model weights:** put the multi-label skin concern model at `models/skin_concerns/model.pt`
-   (download `model.pt` from `My Drive/SkinIQ/models/skin_concerns/`). Without it the app still works: the photo
-   is skipped with a note.
-2. **Weather key (optional):** copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add your
-   OpenWeatherMap key. Without a key, Open-Meteo is used. Never commit `secrets.toml`.
+Open it at **http://localhost:8501**: the camera and location need a secure page, and `localhost` counts as one.
+
+1. **Model weights:** downloaded automatically on first use (82 MB, from the project's Google Drive, checked by
+   SHA-256) to `models/skin_concerns/model.pt`. If the download fails, the photo is skipped and the results note
+   says why.
+2. **Weather key (optional):** copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add an
+   OpenWeatherMap key; it is used only as a fallback. Never commit `secrets.toml`.
 
 ## Pages
 
@@ -27,17 +29,32 @@ streamlit run app/streamlit_app.py
 The questionnaire is one form, so the analysis runs only when "Analyse my skin" is pressed. All single-choice
 questions are required; missing ones are listed by number.
 
-## Weather
+## Photo: guided camera and quality check
 
-| | Location, temperature, humidity | UV index |
-|---|---|---|
-| With an OpenWeatherMap key | OpenWeatherMap (geocoding + current weather) | Open-Meteo |
-| Without a key | Open-Meteo | Open-Meteo |
+- **Guided camera** (`app/components/camera.py`, a Streamlit custom component): live video with a head-and-shoulders
+  outline. Face detection runs in the browser (MediaPipe face detector, bundled in `app/static/mediapipe/` and
+  served with `server.enableStaticServing`). The outline is **red** with a hint (no face, more than one face,
+  centre your face, move closer/back, too dark/bright) and turns **green** when exactly one face is centred at
+  the right distance in enough light; only then is "Take photo" enabled.
+- **Quality check on every photo**, uploaded or taken (`skiniq/vision/quality.py`, YuNet on the server): rejected
+  with a message if there is no face, more than one face, the face is too small, or the photo is blurry, too
+  dark, overexposed or under 240 px. Thresholds were calibrated on the test photos: 88% of 150 real selfies are
+  accepted; close-up skin photos without a face are rejected.
 
-OpenWeatherMap's free plan has no UV index (it needs the paid One Call API), so UV always comes from Open-Meteo
-(free, no key). The UV used is **today's maximum**, since current UV is 0 at night and the morning routine should
-plan for the day. Requests time out after 8 s with one retry (timeouts, HTTP 429); results are cached for 30
-minutes. If weather fails the analysis continues without weather adjustments and says why.
+## Location and weather
+
+- **Location is detected automatically** (`app/components/geolocation.py`): the browser's Geolocation API (GPS /
+  Wi-Fi) gives the exact position after the user allows it once. The place name comes from BigDataCloud's free
+  reverse geocoding, called from the browser. There is no location box. If access is blocked, a "Try again"
+  button and instructions are shown, and the analysis runs without weather adjustments.
+- **Today's averages at that point** (`fetch_weather_at`): Open-Meteo's hourly forecast for the local day,
+  averaged: temperature, relative humidity, and UV index over daylight hours. The day's **peak UV** is also
+  shown, and the sun-protection rules use it, because WHO UV categories describe the day's maximum (in Malaysia
+  the daylight average is often about 4 on a day peaking at 10).
+- **Fallback:** with an OpenWeatherMap key, its free 5-day/3-hour forecast gives today's average temperature
+  and humidity (no UV) if Open-Meteo fails. One retry on timeout or rate limit; results cached 30 minutes on a
+  ~100 m grid; the exact detected coordinates are always shown.
+- The results show the place, coordinates, average temperature, humidity and UV, and peak UV.
 
 ## Performance
 
