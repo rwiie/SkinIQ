@@ -6,6 +6,16 @@ from pathlib import Path
 
 import streamlit as st
 
+MIN_STREAMLIT = (1, 67)
+if tuple(int(x) for x in st.__version__.split(".")[:2]) < MIN_STREAMLIT:
+    st.error(
+        f"SkinIQ needs Streamlit {'.'.join(map(str, MIN_STREAMLIT))} or newer, but this Python has "
+        f"Streamlit {st.__version__} ({sys.executable}). Activate the project environment "
+        "(source .venv/bin/activate) and run: pip install -r requirements.txt",
+        icon=":material/error:",
+    )
+    st.stop()
+
 # `streamlit run app/streamlit_app.py` only puts app/ on sys.path; add the repo root
 # so the skiniq package is importable locally and on Streamlit Community Cloud.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
