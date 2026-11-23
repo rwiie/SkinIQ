@@ -4,7 +4,7 @@ The outline is red until exactly one face is centred in it at the right distance
 enough light, then turns green and the "Take photo" button is enabled. Face detection
 runs in the browser with MediaPipe (bundled in app/static/mediapipe, served by
 Streamlit static serving). If the detector cannot load, the guide stays grey, the photo
-can still be taken, and the server-side quality check (skiniq.vision.quality) decides.
+can still be taken (the status line says why), and the server-side quality check (skiniq.vision.quality) decides.
 
 Result, kept in st.session_state[key]["photo"]: a JPEG data URL, or None after "Retake".
 """
@@ -72,19 +72,32 @@ const instances = new WeakMap();
 // Guide geometry in the 640x480 guide space (matches the SVG ellipse).
 const OVAL = { cx: 320, cy: 205, rx: 118, ry: 152 };
 
+const LOAD_TIMEOUT_MS = 25000;   // the detector is ~9 MB of WebAssembly on first load
+const MAX_FRAME_ERRORS = 8;      // consecutive failed frames before falling back
+
 let detectorPromise = null;
+let detectorError = "";
 function loadDetector(base) {
   if (!detectorPromise) {
-    detectorPromise = (async () => {
+    const load = (async () => {
       const root = new URL(base, document.baseURI).href;
       const vision = await import(root + "vision_bundle.mjs");
       const files = await vision.FilesetResolver.forVisionTasks(root + "wasm");
       return vision.FaceDetector.createFromOptions(files, {
-        baseOptions: { modelAssetPath: root + "blaze_face_short_range.tflite" },
+        baseOptions: { modelAssetPath: root + "blaze_face_short_range.tflite", delegate: "CPU" },
         runningMode: "VIDEO",
         minDetectionConfidence: 0.6,
       });
-    })().catch((e) => { console.warn("SkinIQ face detector unavailable:", e); detectorPromise = null; return null; });
+    })();
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timed out loading the face detector")), LOAD_TIMEOUT_MS));
+    detectorPromise = Promise.race([load, timeout]).catch((e) => {
+      detectorError = (e && e.message) ||
+        (typeof Event !== "undefined" && e instanceof Event ? "a detector file could not be loaded" : String(e));
+      console.warn("SkinIQ face detector unavailable:", e);
+      detectorPromise = null;  // allow a retry next time the camera starts
+      return null;
+    });
   }
   return detectorPromise;
 }
@@ -147,13 +160,39 @@ export default function (component) {
     if (inst.stream) { inst.stream.getTracks().forEach((t) => t.stop()); inst.stream = null; }
   };
 
+  const fallback = (why) => {
+    stopLoop();
+    inst.detector = null;
+    console.warn("SkinIQ face guide off:", why);
+    setState(null, "Face guide unavailable on this browser (" + why + "). Fit your face in the outline " +
+      "and take the photo; it is checked after you take it.");
+    shoot.disabled = false;
+  };
+
   const startLoop = () => {
     stopLoop();
     const canvas = document.createElement("canvas");
+    let errors = 0, lastTs = 0;
+    const startedAt = performance.now();
+    setState("red", "Looking for your face…");
     inst.timer = setInterval(() => {
-      if (!inst.detector || video.readyState < 2) return;
-      let faces = [];
-      try { faces = inst.detector.detectForVideo(video, performance.now()).detections || []; } catch (e) { return; }
+      if (!inst.detector) return;
+      if (video.readyState < 2 || !video.videoWidth) {
+        if (performance.now() - startedAt > 8000) setState("red", "Waiting for the camera picture…");
+        return;
+      }
+      let faces;
+      try {
+        const ts = Math.max(performance.now(), lastTs + 1);  // timestamps must increase
+        lastTs = ts;
+        faces = inst.detector.detectForVideo(video, ts).detections || [];
+        errors = 0;
+      } catch (e) {
+        errors += 1;
+        console.warn("SkinIQ face detection failed on a frame:", e);
+        if (errors >= MAX_FRAME_ERRORS) fallback((e && e.message) || "detection error");
+        return;
+      }
       const [cls, text] = judge(faces, video, canvas);
       inst.aligned = cls === "green";
       setState(cls, text);
@@ -185,12 +224,9 @@ export default function (component) {
     }
     setState(null, "Loading face guide…");
     inst.detector = await loadDetector(data.static_base);
-    if (inst.detector) {
-      startLoop();
-    } else {
-      setState(null, "Face guide unavailable — fit your face in the outline; the photo will be checked after you take it");
-      shoot.disabled = false;
-    }
+    if (!inst.stream) return;  // camera stopped (photo taken or page left) while loading
+    if (inst.detector) startLoop();
+    else fallback(detectorError || "the face detector could not load");
   };
 
   shoot.onclick = () => {

@@ -4,7 +4,7 @@ Used by the camera guide (`app/components/camera.py`) for live face detection in
 
 | File | Source | Licence |
 |---|---|---|
-| `vision_bundle.mjs`, `wasm/vision_wasm_internal.{js,wasm}` | npm `@mediapipe/tasks-vision@0.10.14` | Apache-2.0 |
+| `vision_bundle.mjs`, `wasm/vision_wasm_internal.{js,wasm}`, `wasm/vision_wasm_nosimd_internal.{js,wasm}` (for browsers without WebAssembly SIMD, e.g. older Safari) | npm `@mediapipe/tasks-vision@0.10.14` | Apache-2.0 |
 | `blaze_face_short_range.tflite` | Google MediaPipe model (`storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1`) | Apache-2.0 |
 
 Served by Streamlit static file serving (`server.enableStaticServing = true`) at `app/static/mediapipe/`.
