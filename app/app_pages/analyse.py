@@ -1,4 +1,5 @@
 import io
+from html import escape
 
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
@@ -172,8 +173,10 @@ def product_card(step_: dict, weekly: bool = False) -> None:
         photo, text = st.columns([1, 3], vertical_alignment="center")
         with photo:
             if p.get("image_url"):
-                st.image(p["image_url"], alt=p["product"], width="stretch")
-                st.caption(f"Photo: [{SOURCE_NAME}]({p['image_source']})")
+                # fixed height so tall bottles and wide jars take the same space
+                st.html(f'<img src="{escape(p["image_url"], quote=True)}" alt="{escape(p["product"], quote=True)}" '
+                        'style="display:block;margin:0 auto;height:140px;max-width:100%;object-fit:contain">')
+                st.caption(f"Photo: [{SOURCE_NAME}]({p['image_source']})", text_alignment="center")
             else:
                 with st.container(height=120, horizontal_alignment="center", vertical_alignment="center",
                                   border=False):
