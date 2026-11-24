@@ -36,6 +36,7 @@ OpenWeatherMap (temp/humidity/UV) ─┘
 | `skiniq/report.py` | Results as a downloadable PDF | 3.7 |
 | `skiniq/age_guidance.py` | Skin care guidance per age group (questionnaire Q1) | 3.7 |
 | `skiniq/product_images.py`, `tools/fetch_product_images.py` | Product photos from INKEEDecoder | 3.7 |
+| `docs/gallery/`, `tools/make_gallery.py` | [Product photo gallery](docs/gallery/README.md) (all products, by category) | 3.7 |
 | `app/streamlit_app.py` | Streamlit prototype | 3.7 |
 | `training/` | Data preparation and model training | 3.5, 3.6.1 |
 | `tests/` | Rule validation, recommender and pipeline tests | 3.8 |

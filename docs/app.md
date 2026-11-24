@@ -55,6 +55,9 @@ pixels connected to the photo's border, stopped at the product's outline so whit
 the product is trimmed and centred on a square with the same margin, so every card and the PDF show the
 products at the same size. Photos with a non-plain background are trimmed and centred but keep it.
 
+All product photos can be browsed by category in the [product photo gallery](gallery/README.md)
+(rebuild it with `python tools/make_gallery.py` after the photo list changes).
+
 ## Photo: guided camera and quality check
 
 - **Guided camera** (`app/components/camera.py`, a Streamlit custom component): live video with a head-and-shoulders

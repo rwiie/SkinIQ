@@ -156,3 +156,14 @@ def test_routine_photos_skip_products_without_a_usable_photo(monkeypatch):
     photos = services.routine_photos(result)
     assert list(photos) == ["A"] and photos["A"].startswith(b"\x89PNG")
     services.product_photo.cache_clear()
+
+
+def test_gallery_is_in_sync_with_the_photo_list():
+    """docs/gallery is generated from the photo list: rebuild with `python tools/make_gallery.py`."""
+    import re
+
+    root = Path(__file__).resolve().parent.parent
+    pages = list((root / "docs" / "gallery").glob("*.md"))
+    shown = sum(len(re.findall(r"<img ", p.read_text(encoding="utf-8"))) for p in pages)
+    with_photo = len(pi._table(str(pi.IMAGES_CSV)))
+    assert shown == with_photo, "gallery out of date: run python tools/make_gallery.py"
