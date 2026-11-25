@@ -28,6 +28,7 @@ def init() -> None:
     ss.setdefault("step", PHOTO)
     ss.setdefault("photo_bytes", None)   # accepted photo (passed the quality check)
     ss.setdefault("photo_skipped", False)  # "Skip" pressed on the photo step
+    ss.setdefault("photo_from", None)      # "camera" or "upload": where the accepted photo came from
     ss.setdefault("photo_nonce", 0)      # bumps to reset the uploader / camera
     ss.setdefault("location", None)      # last result of the location component
     ss.setdefault("result", None)
@@ -41,6 +42,7 @@ def restart() -> None:
     for key in ANSWER_KEYS + ["photo_source"]:
         ss.pop(key, None)
     ss.photo_bytes = None
+    ss.photo_from = None
     ss.photo_skipped = False
     ss.photo_nonce = ss.get("photo_nonce", 0) + 1
     ss.result = ss.result_pdf = ss.nav_error = None
@@ -49,6 +51,7 @@ def restart() -> None:
 
 def clear_photo() -> None:
     st.session_state.photo_bytes = None
+    st.session_state.photo_from = None
     st.session_state.photo_nonce += 1
 
 

@@ -1,67 +1,66 @@
 # Photo check: framing, visibility and lighting
 
-`skiniq/vision/quality.py` decides whether a photo can be analysed. The same checks, with the same
-thresholds (`quality.settings()`), run on uploaded photos, on captured photos, and live in the camera guide
-(`app/components/camera.py`), so the outline only turns green for a photo the server will accept.
+`skiniq/vision/quality.py` decides whether a photo can be analysed. The same checks, with the same thresholds
+(`quality.settings()`), run on uploaded photos, on captured photos (server), and live in the camera guide
+(`app/components/camera.py`, in the browser), so the outline only turns green for a face the server will accept.
 
-## Why the face detector alone is not enough
+## Why trained models
 
-YuNet finds faces even when they are partly covered. On 900 dataset selfies with occluders drawn on, its median
-detection score stayed high: 0.92 for clean faces, 0.90 with sunglasses, 0.85 with a mask, 0.91 with one eye
-covered. So "a face was detected" does not mean the face is fully visible.
+YuNet (face detection) still finds a face when part of it is covered: on 900 dataset selfies with occluders drawn
+on, its median score was 0.92 for clean faces, 0.90 with sunglasses and 0.85 with a mask. A first version with
+hand-written colour and edge rules missed real glasses, sheet masks, hands and closed eyes in user testing, so the
+visibility checks now use trained models:
 
-## How each part of the face is checked
+| Model | What it does here | Source and licence | Size |
+|---|---|---|---:|
+| YuNet (OpenCV Zoo) | Face box and 5 landmarks; framing and pose | MIT | 0.2 MB |
+| Face parsing, BiSeNet ResNet-18 (yakhyo/face-parsing via `jbrownkramer/face-parsing`) | Labels each pixel: skin, eyebrows, eyes, **glasses**, nose, lips, **hair**, **hat**… | MIT code; trained on CelebAMask-HQ (**non-commercial research and education only**) | 53 MB |
+| MediaPipe palm detector + hand landmark model (OpenCV Zoo ONNX) | Hands touching or covering the face (face parsing labels hands as skin) | Apache-2.0 | 4 + 4 MB |
+| CLIP ViT-B/32 image encoder (OpenAI; quantized ONNX by Xenova) + two small classifiers trained for SkinIQ (`skiniq/vision/assets/clip_probes.json`) | Drawing / cartoon vs real photo; hand on face (extra evidence) | MIT | 89 MB |
 
-YuNet gives five landmarks (eyes, nose tip, mouth corners). The face is warped so the eyes and the mouth centre
-land on fixed points (192 × 224 px), then small patches (eyes, forehead, cheeks, nose, mouth, chin, nose
-bridge, under the eyes) are measured. Every measure is relative to the person's **own** skin (cheeks and nose),
-so it works the same for every skin tone.
+Models are downloaded on first use into `models/photo_check/` and checked against their SHA-256
+(`skiniq/vision/face_models.py`). The camera runs YuNet, face parsing and the palm detector in the browser with
+ONNX Runtime Web (CPU, no WebGL); the app copies the two larger models to `app/static/photo_check/` for it.
+If the models cannot be downloaded, the server falls back to the earlier rule-based checks.
 
-| Problem | Signal | Threshold |
+## Checks and messages
+
+| Problem | How it is detected | Threshold (`face_models.PARTS`, `HANDS`, `quality.LIGHTING`) |
 |---|---|---|
-| Sunglasses | Both eyes dark (mean lightness < 0.35 × skin) and mostly dark pixels (> 80%) | `sunglasses_*` |
-| Glasses | Strong edges across the nose bridge (> 2.8 × cheek detail) and along the lower rims (> 2.2 ×) | `glasses_*` |
-| Eye covered (hand, hair, object) | An eye with almost no contrast (< 0.06 × skin) that is not dark | `eye_*` |
-| Face mask | Nose/mouth/chin colour far from the forehead (> 18) with no red lips, or a smooth mouth area (< 0.035) with no red lips | `mask_*` |
-| One side covered | Cheek colours differ (> 20), or one half has much less detail than the other (< 0.5) | `half_*` |
-| Too dark / too bright | > 20% of skin pixels crushed to black / > 10% blown out to white | `LIGHTING` |
-| One side in shadow | Cheek lightness differs by > 30 (L*, 0–100) | `max_side_diff` |
-| Framing | Face box 30–60% of the photo height, centre within the middle band, chin in the upper 80%, not touching the edges | `FRAMING` |
-| Pose | Head tilted > 15°, or nose off the eye midline by > 0.25 × eye distance (turned) | `max_roll_deg`, `max_yaw` |
+| Eye closed or covered | Visible eye pixels (white, iris) around each eye landmark, per eye | < 0.0015 × (eye distance)² |
+| Glasses / sunglasses | Glasses pixels over **both** eyes (a phone or lens over one eye does not count); sunglasses if the lenses are dark | ≥ 15% of both eye areas; lens lightness < 0.55 × skin |
+| Face mask over nose or mouth | Nose or lip pixels missing where the landmarks put them | nose < 10% or lips < 5% of their areas |
+| Sheet / clay mask, colour filter | Median redness (a\*) of the skin: every real skin tone is reddish; white sheet masks, green clay and blue/grey filters are not | a\* < 3 |
+| Forehead covered | Hair or hat pixels in the band just above the eyebrows (pure-black areas and areas outside the photo ignored) | > 55% |
+| Hand on face | Palm detector on the photo and on a close-up of the face, each palm overlapping the face confirmed by the hand landmark model; plus the CLIP hand classifier | palm ≥ 0.8 or landmarks ≥ 0.5, or CLIP ≥ 0.7 |
+| Drawing / cartoon | CLIP classifier | ≥ 0.5 |
+| Black-and-white photo | 90th percentile HSV saturation of the photo | < 25 |
+| Too dark | The brightest 5% of the photo (L\*) is dim (in a well-lit photo something is bright whatever the skin tone), or > 20% of skin pixels crushed to black | < 65 |
+| Too bright / one side in shadow | Skin pixels blown out; cheek lightness differs | > 10%; > 30 L\* |
+| Framing and pose (unchanged) | Face 30–60% of the photo height, centred, not cut off; tilt ≤ 15°, not turned | `FRAMING` |
 
-Lighting is judged on clipped and crushed skin, not on average brightness: an average-brightness rule would
-reject darker skin in good light.
+Phone photos are rotated by their EXIF orientation before checking.
 
-## Calibration
+## Evaluation (real photos)
 
-Data: 900 selfies from the skin-type dataset (one face, detection score ≥ 0.85), and copies of each with
-sunglasses, glasses, a face mask, a dark object over one half, a skin-coloured "hand" over one half, or a hand
-over one eye drawn on. For the end-to-end test each photo was placed head and shoulders on a larger canvas, as a
-guided photo would be (600 photos).
+Labels were made by reviewing contact sheets of the 3,923 skin-type dataset selfies (by eye), plus 340 drawn faces
+(huggan/selfie2anime anime, huggan/cartoon-faces, cgarciae/cartoonset; CC BY 4.0) and 100 real selfies from
+huggan/selfie2anime. Photos were placed head and shoulders on a larger canvas, as a guided photo would be.
 
-| Photos | Rejected | Main reason given |
-|---|---:|---|
-| With sunglasses | 93% | sunglasses (78%) |
-| With glasses | 90% | glasses (78%) |
-| With a face mask | 100% | mask (85%) |
-| Dark object over one half | 98% | one side in shadow / covered |
-| Skin-coloured hand over one half | 95% | eye covered (48%), no face (27%) |
-| Hand over one eye | 99% | eye covered (95%) |
-| Clean, facing the camera (400) | 20% | too dark 6%, uneven light 6%, half covered 4% |
-| Clean, all poses | 39% | turned 15%, tilted 14% (posed beauty photos) |
-
-Most "clean" rejections are real problems: reviewing them showed censor bars and cut-out boxes over faces,
-hair across the face, phones, face packs, real glasses and sunglasses, strong side light and profile poses.
-
-**Fairness across skin tones** (clean photos split into thirds by skin lightness: darker / medium / lighter):
-too dark 4.9% / 6.2% / 7.1%, one side in shadow 9.1% / 7.9% / 7.7% (at the calibration threshold of 25; the app
-uses 30), too bright 0% / 0% / 3.5% (lighter skin really does blow out first).
+| Test | Result |
+|---|---|
+| 177 labelled selfies, 104 with a hand on the face (`training/results/photo_check/hand_labels.csv`) | 87% of hand photos rejected for the hand, 4% of the others wrongly |
+| Drawings, each style held out of training | 72–100% caught at 0.5; real photos flagged 0.0–0.1%; YuNet finds no face in a further ~30% of drawings |
+| Real problem photos (hands, glasses, sunglasses, closed eyes, fringe, cap) | All rejected with the right reason, on the server and live in the camera |
+| Darkness | 4.2% of normal photos flagged (the dimmest, reviewed: dim lighting, no well-lit darker skin among them); 64% of the same photos at 45% exposure caught |
+| 400 front-facing dataset selfies | 42% rejected; on review mostly genuine: hand on face 54, forehead covered 41, eyes closed/covered 39, uneven light 22, too dark 19, black-and-white 12, glasses 9, mask 9, unnatural skin colour 8 (this dataset is full of skincare poses) |
 
 ## Limitations
 
-- Rule-based, not a trained occlusion model. Occluders in the calibration were drawn on, so real objects with
-  texture (a patterned mask, a textured hand) may be caught less often, and some real photos are rejected with
-  a less precise reason (for example black-framed glasses in a black-and-white photo reported as sunglasses).
-- Thin rimless glasses and a beard can be confused with no glasses and a mask respectively.
-- The calibration photos are from a public dataset, not users of the app; the guided camera should give cleaner
-  photos than these.
+- The face-parsing weights are for non-commercial research and education (CelebAMask-HQ licence).
+- Lightly tinted sunglasses can be reported as glasses (still rejected).
+- Very wide smiles that nearly close the eyes can be reported as closed eyes.
+- Labels were made by one reviewer from contact sheets; the hand set was partly chosen with the palm detector, so
+  its recall may be optimistic.
+- Skin-tone fairness of the darkness rule could not be measured directly (no skin-tone labels); it uses the
+  brightest part of the photo rather than skin brightness for that reason.

@@ -311,6 +311,166 @@ function visibilityProblems(m, V, LI) {
   return codes;
 }
 
+// ---- trained models in the browser: face parts (BiSeNet face parsing) and hands (MediaPipe palm) ----
+// Same crops, measurements and thresholds as skiniq/vision/face_models.py.
+
+const PARSE = 512, CROP_SCALE = 1.7;
+const L_SKIN = 1, L_LEYE = 4, L_REYE = 5, L_GLASSES = 6, L_NOSE = 10, L_MOUTH = 11, L_ULIP = 12, L_LLIP = 13, L_HAIR = 17, L_HAT = 18;
+const PARTS_EVERY_MS = 600, PARTS_FRESH_MS = 2000;
+
+let partsPromise = null;
+function loadPartsModels(base, files) {
+  if (!partsPromise) {
+    partsPromise = (async () => {
+      const root = new URL(base, document.baseURI).href;
+      const ort = await import(root + "ort.wasm.bundle.min.mjs");   // already loaded for YuNet
+      const modelsRoot = new URL("app/static/photo_check/", document.baseURI).href;
+      const [parse, palm, anchors] = await Promise.all([
+        ort.InferenceSession.create(modelsRoot + files.face_parsing, { executionProviders: ["wasm"] }),
+        ort.InferenceSession.create(modelsRoot + files.palm, { executionProviders: ["wasm"] }),
+        fetch(root + "palm_anchors.json").then((r) => r.json()),
+      ]);
+      return { ort, parse, palm, anchors };
+    })().catch((e) => { console.warn("SkinIQ face-part models unavailable:", e); return null; });
+  }
+  return partsPromise;
+}
+
+function cropCanvas(src, cx, cy, side, size) {
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, size, size);
+  const s = size / side;
+  ctx.setTransform(s, 0, 0, s, -(cx - side / 2) * s, -(cy - side / 2) * s);
+  ctx.drawImage(src, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return { canvas: c, ctx, s, x0: cx - side / 2, y0: cy - side / 2 };
+}
+
+async function parseFace(M, frame, f) {
+  const [x, y, w, h] = f, side = Math.max(w, h) * CROP_SCALE, cx = x + w / 2, cy = y + h / 2;
+  const { ctx, s, x0, y0 } = cropCanvas(frame, cx, cy, side, PARSE);
+  const px = ctx.getImageData(0, 0, PARSE, PARSE).data, n = PARSE * PARSE;
+  const input = new Float32Array(3 * n), mean = [0.485, 0.456, 0.406], sd = [0.229, 0.224, 0.225];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) input[k * n + i] = (px[4 * i + k] / 255 - mean[k]) / sd[k];
+  const out = await M.parse.run({ input: new M.ort.Tensor("float32", input, [1, 3, PARSE, PARSE]) }, ["output"]);
+  const logits = out.output.data, labels = new Uint8Array(n), valid = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    let best = 0, bv = logits[i];
+    for (let k = 1; k < 19; k++) { const v = logits[k * n + i]; if (v > bv) { bv = v; best = k; } }
+    labels[i] = best;
+    const fx = (i % PARSE) / s + x0, fy = Math.floor(i / PARSE) / s + y0;
+    valid[i] = fx >= 0 && fy >= 0 && fx < frame.width && fy < frame.height && Math.max(px[4 * i], px[4 * i + 1], px[4 * i + 2]) > 6 ? 1 : 0;
+  }
+  const pts = [];
+  for (let k = 0; k < 5; k++) pts.push([(f[4 + 2 * k] - x0) * s, (f[5 + 2 * k] - y0) * s]);
+  return { labels, valid, pts, px };
+}
+
+function partsMeasures(P) {
+  const { labels, valid, pts, px } = P;
+  const [left, right] = pts[0][0] <= pts[1][0] ? [pts[0], pts[1]] : [pts[1], pts[0]];
+  const iod = Math.max(Math.hypot(right[0] - left[0], right[1] - left[1]), 1);
+  const lum = (i) => srgbToLab(px[4 * i], px[4 * i + 1], px[4 * i + 2]);
+  const box = (cx, cy, hw, hh, fn) => {
+    for (let y = Math.max(0, Math.floor(cy - hh)); y < Math.min(PARSE, Math.floor(cy + hh)); y++)
+      for (let x = Math.max(0, Math.floor(cx - hw)); x < Math.min(PARSE, Math.floor(cx + hw)); x++) fn(y * PARSE + x);
+  };
+  const share = (cx, cy, hw, hh, ids) => {
+    let hit = 0, inside = 0;
+    box(cx, cy, hw, hh, (i) => { if (valid[i]) { inside++; if (ids.includes(labels[i])) hit++; } });
+    return inside ? hit / inside : 0;
+  };
+  let skinL = [], skinA = [];
+  for (let i = 0; i < labels.length; i += 3) if (labels[i] === L_SKIN && valid[i]) { const l = lum(i); skinL.push(l[0]); skinA.push(l[1]); }
+  const sL = skinL.length > 50 ? median(skinL) : 50;
+  const m = {}, lens = [];
+  for (const [name, e] of [["left", left], ["right", right]]) {
+    let eye = 0;
+    box(e[0], e[1], 0.45 * iod, 0.3 * iod, (i) => {
+      if (labels[i] === L_LEYE || labels[i] === L_REYE) eye++;
+      if (labels[i] === L_GLASSES && valid[i]) lens.push(lum(i)[0]);
+    });
+    m["eye_" + name] = eye / (iod * iod);
+    m["glasses_" + name] = share(e[0], e[1], 0.45 * iod, 0.3 * iod, [L_GLASSES]);
+  }
+  m.lens_lightness = lens.length > 30 ? median(lens) / Math.max(sL, 1) : 1;
+  m.nose = share(pts[2][0], pts[2][1] - 0.15 * iod, 0.35 * iod, 0.4 * iod, [L_NOSE]);
+  const mouth = [(pts[3][0] + pts[4][0]) / 2, (pts[3][1] + pts[4][1]) / 2];
+  m.lips = share(mouth[0], mouth[1], 0.55 * iod, 0.35 * iod, [L_ULIP, L_LLIP, L_MOUTH]);
+  m.forehead_covered = share((left[0] + right[0]) / 2, (left[1] + right[1]) / 2 - 0.75 * iod, 0.6 * iod, 0.25 * iod, [L_HAIR, L_HAT]);
+  m.skin_redness = skinA.length > 50 ? median(skinA) : 0;
+  return m;
+}
+
+function partsProblems(m, T) {
+  const codes = [];
+  if (Math.min(m.glasses_left, m.glasses_right) >= T.min_glasses_share) codes.push(m.lens_lightness < T.max_lens_lightness ? "sunglasses" : "glasses");
+  else if (Math.min(m.eye_left, m.eye_right) < T.min_eye_area) codes.push("eye_hidden");
+  if (m.nose < T.min_nose_share || m.lips < T.min_lips_share) codes.push("mask");
+  if (m.forehead_covered > T.max_forehead_covered) codes.push("forehead_covered");
+  if (m.skin_redness < T.min_skin_redness && !codes.includes("mask")) codes.push("unnatural_skin");
+  return codes;
+}
+
+// MediaPipe palm detector (as skiniq/vision/vendor/mp_palmdet.py): palms in source pixels with scores.
+async function palms(M, src, threshold) {
+  const S = 192, h = src.height, w = src.width, ratio = Math.min(S / h, S / w);
+  const rw = Math.floor(w * ratio), rh = Math.floor(h * ratio), left = Math.floor((S - rw) / 2), top = Math.floor((S - rh) / 2);
+  const c = document.createElement("canvas"); c.width = S; c.height = S;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, S, S); ctx.drawImage(src, left, top, rw, rh);
+  const px = ctx.getImageData(0, 0, S, S).data, input = new Float32Array(S * S * 3);
+  for (let i = 0; i < S * S; i++) { input[3 * i] = px[4 * i] / 255; input[3 * i + 1] = px[4 * i + 1] / 255; input[3 * i + 2] = px[4 * i + 2] / 255; }
+  const out = await M.palm.run({ input_1: new M.ort.Tensor("float32", input, [1, S, S, 3]) });
+  const reg = out.Identity.data, raw = out.Identity_1.data, scale = Math.max(w, h);
+  const padX = Math.floor(left / ratio), padY = Math.floor(top / ratio), cands = [];
+  for (let i = 0; i < M.anchors.length; i++) {
+    const score = 1 / (1 + Math.exp(-raw[i]));
+    if (score < threshold) continue;
+    const [ax, ay] = M.anchors[i], cx = reg[18 * i] / S + ax, cy = reg[18 * i + 1] / S + ay;
+    const bw = reg[18 * i + 2] / S, bh = reg[18 * i + 3] / S;
+    cands.push([(cx - bw / 2) * scale - padX, (cy - bh / 2) * scale - padY, bw * scale, bh * scale, score]);
+  }
+  cands.sort((a, b) => b[4] - a[4]);
+  const kept = [];
+  for (const b of cands) if (kept.every((k) => iou(k, b) < 0.3)) kept.push(b);
+  return kept;
+}
+
+async function handOnFace(M, frame, f, H) {
+  const [x, y, w, h] = f, fx0 = x - 0.1 * w, fy0 = y - 0.1 * h, fx1 = x + 1.1 * w, fy1 = y + 1.1 * h;
+  const side = 2.2 * Math.max(w, h), cx = x + w / 2, cy = y + h / 2;
+  const close = cropCanvas(frame, cx, cy, side, 384);
+  const sources = [[frame, 1, 0, 0], [close.canvas, 1 / close.s, close.x0, close.y0]];
+  for (const [src, k, ox, oy] of sources) {
+    for (const [bx, by, bw, bh, score] of await palms(M, src, H.palm_score)) {
+      const px0 = bx * k + ox, py0 = by * k + oy, px1 = px0 + bw * k, py1 = py0 + bh * k;
+      const overlap = Math.max(0, Math.min(px1, fx1) - Math.max(px0, fx0)) * Math.max(0, Math.min(py1, fy1) - Math.max(py0, fy0));
+      if (overlap >= H.min_overlap * (px1 - px0) * (py1 - py0)) return true;
+    }
+  }
+  return false;
+}
+
+function highlights(frame) {   // L* of the brightest 5% of the frame (as face_models.highlights)
+  const c = document.createElement("canvas"); c.width = 160; c.height = 120;
+  const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(frame, 0, 0, 160, 120);
+  const px = ctx.getImageData(0, 0, 160, 120).data, L = [];
+  for (let i = 0; i < px.length; i += 4) L.push(srgbToLab(px[i], px[i + 1], px[i + 2])[0]);
+  L.sort((a, b) => a - b);
+  return L[Math.floor(0.95 * (L.length - 1))];
+}
+
+async function modelProblems(M, frame, f, S) {
+  const P = await parseFace(M, frame, f);
+  const codes = partsProblems(partsMeasures(P), S.parts);
+  if (await handOnFace(M, frame, f, S.hands)) codes.push("hand");
+  if (highlights(frame) < S.parts.min_highlights) codes.push("too_dark");
+  return codes;
+}
+
 // Short hints for the live guide; other problems use the server check's messages.
 const LIVE_HINTS = {
   too_far: "Move closer — fit your face in the outline",
@@ -319,9 +479,12 @@ const LIVE_HINTS = {
   cut_off: "Move back or centre your face — your whole face must be inside the outline",
   tilted: "Keep your head straight",
   turned: "Face the camera straight on",
+  hand: "Move your hands away from your face",
+  eye_hidden: "Keep both eyes open and uncovered",
+  forehead_covered: "Your forehead is covered — pull your hair back or remove your hat",
 };
 
-function judge(faces, frame, canon, S) {
+function judge(faces, frame, canon, S, parts) {
   if (faces.length === 0) return ["red", "No face detected — look straight at the camera with nothing covering your face", []];
   if (faces.length > 1) return ["red", "More than one face — only you should be in the frame", ["several_faces"]];
   const f = faces[0];
@@ -329,7 +492,23 @@ function judge(faces, frame, canon, S) {
   // Measure the face once it is placed in the outline (size and position OK). Something covering the
   // face can also shift the landmarks and look like a turned or tilted head, so it is reported first.
   const placed = framing.every((c) => c === "tilted" || c === "turned");
-  const codes = placed ? [...visibilityProblems(faceVisibility(frame, f, canon), S.visibility, S.lighting), ...framing] : framing;
+  let codes = framing;
+  if (placed) {
+    const m = faceVisibility(frame, f, canon);
+    let vis;
+    if (parts.loading) return ["red", "Loading face checks…", ["checking"]];   // never green before the models run
+    if (parts.models) {
+      // trained-model checks (latest result, refreshed every ~0.6 s) plus the lighting measures
+      if (!parts.codes || performance.now() - parts.time > PARTS_FRESH_MS) return ["red", "Checking your face…", ["checking"]];
+      vis = [...parts.codes];
+      if (m.crushed > S.lighting.max_crushed && !vis.includes("too_dark")) vis.push("too_dark");
+      else if (m.clipped > S.lighting.max_clipped && !vis.includes("too_dark")) vis.push("too_bright");
+      if (m.cheek_light_diff > S.lighting.max_side_diff && !vis.includes("hand")) vis.push("uneven_light");
+    } else {
+      vis = visibilityProblems(m, S.visibility, S.lighting);   // rule-based fallback
+    }
+    codes = [...vis, ...framing];
+  }
   if (codes.length) return ["red", LIVE_HINTS[codes[0]] || S.messages[codes[0]], codes];
   return ["green", "Face detected — hold still and take the photo", []];
 }
@@ -385,6 +564,24 @@ export default function (component) {
     const startedAt = performance.now();
     setState("red", "Looking for your face…");
     let busy = false;
+    // trained face-part and hand models: loaded in the background, run every PARTS_EVERY_MS
+    const parts = { models: null, loading: !!data.parts_models, codes: null, time: 0, busy: false, last: 0 };
+    if (data.parts_models) loadPartsModels(data.static_base, data.parts_models).then((M) => { parts.models = M; parts.loading = false; });
+    const runParts = (faces) => {
+      if (!parts.models || parts.busy || faces.length !== 1 || performance.now() - parts.last < PARTS_EVERY_MS) return;
+      const snap = document.createElement("canvas");
+      snap.width = FRAME_W; snap.height = FRAME_H;
+      snap.getContext("2d").drawImage(frame, 0, 0);
+      parts.busy = true; parts.last = performance.now();
+      const t0 = performance.now();
+      modelProblems(parts.models, snap, faces[0], data.settings)
+        .then((codes) => {
+          if (!parts.codes) console.info(`SkinIQ face-part check: ${Math.round(performance.now() - t0)} ms`);
+          parts.codes = codes; parts.time = performance.now();
+        })
+        .catch((e) => { console.warn("SkinIQ face-part check failed:", e); })
+        .finally(() => { parts.busy = false; });
+    };
     inst.timer = setInterval(async () => {
       if (!inst.detector || busy) return;
       if (video.readyState < 2 || !video.videoWidth) {
@@ -397,7 +594,8 @@ export default function (component) {
       try {
         fctx.drawImage(video, ...visibleRegion(video), 0, 0, FRAME_W, FRAME_H);  // unmirrored, as captured
         const faces = await detect(frame);
-        verdict = judge(faces, frame, canon, data.settings);
+        verdict = judge(faces, frame, canon, data.settings, parts);
+        if (!verdict[2].length || verdict[2].every((c) => c === "checking" || !["too_far", "too_close", "off_centre", "cut_off", "several_faces"].includes(c))) runParts(faces);
         errors = 0;
       } catch (e) {
         errors += 1;
@@ -481,12 +679,30 @@ export default function (component) {
 _CAMERA = st.components.v2.component("skiniq_camera", html=_HTML, css=_CSS, js=_JS)
 
 
-def face_camera(key: str = "face_camera") -> bytes | None:
-    """Show the guided camera; return the captured JPEG bytes, or None."""
-    current = (st.session_state.get(key) or {}).get("photo")
-    result = _CAMERA(key=key, data={"photo": current, "static_base": STATIC_BASE, "settings": settings()},
+def face_camera(key: str = "face_camera", initial: bytes | None = None) -> tuple[bytes | None, bool]:
+    """Show the guided camera. Returns (captured JPEG bytes or None, retaken).
+
+    `initial` is a photo accepted earlier: it is shown as the captured still (with "Retake") when the
+    component has no photo of its own yet. `retaken` is True once "Retake" was pressed, so the caller can
+    drop the earlier photo; the live camera then starts again straight away.
+    """
+    state = st.session_state.get(key) or {}
+    retaken = "photo" in state and state["photo"] is None
+    current = state.get("photo")
+    if not current and initial and not retaken:
+        current = "data:image/jpeg;base64," + base64.b64encode(initial).decode()
+    parts_models = None
+    try:
+        from app.services import browser_model_files, browser_models
+
+        if browser_models():
+            parts_models = browser_model_files()
+    except Exception:  # models unavailable: the camera uses its rule-based checks
+        parts_models = None
+    result = _CAMERA(key=key, data={"photo": current, "static_base": STATIC_BASE, "settings": settings(),
+                                    "parts_models": parts_models},
                      on_photo_change=lambda: None)
-    url = result.photo  # state persists across reruns; None before a capture and after "Retake"
+    url = result.photo or current  # state persists across reruns; None after "Retake"
     if not url or "," not in url:
-        return None
-    return base64.b64decode(url.split(",", 1)[1])
+        return None, retaken
+    return base64.b64decode(url.split(",", 1)[1]), retaken

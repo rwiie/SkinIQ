@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import shutil
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from dataclasses import replace
@@ -14,6 +16,7 @@ from PIL import Image
 from skiniq.environment import EnvironmentData, coordinates_label, fetch_weather_at
 from skiniq.pipeline import load_classifier
 from skiniq.product_images import tidy_photo
+from skiniq.vision import face_models
 from skiniq.recommender import default_index
 from skiniq.vision.quality import QualityReport, check_photo
 
@@ -82,6 +85,29 @@ def routine_photos(result: dict) -> dict[str, bytes]:
     with ThreadPoolExecutor(max_workers=6) as pool:
         photos = dict(zip(urls, pool.map(product_photo, urls.values())))
     return {title: data for title, data in photos.items() if data}
+
+
+BROWSER_MODELS_DIR = Path(__file__).resolve().parent / "static" / "photo_check"
+BROWSER_MODELS = ("face_parsing", "palm")
+
+
+@st.cache_resource(show_spinner="Preparing the face checks (downloaded on first use, about 150 MB)…")
+def browser_models() -> bool:
+    """Download the photo-check models and put the camera's two into app/static/photo_check/ (served to the
+    browser). False if they cannot be downloaded: the camera then uses its rule-based checks."""
+    if not face_models.available():
+        return False
+    BROWSER_MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    for name in BROWSER_MODELS:
+        src = face_models.model_path(name)
+        dst = BROWSER_MODELS_DIR / src.name
+        if not dst.exists() or dst.stat().st_size != src.stat().st_size:
+            shutil.copyfile(src, dst)
+    return True
+
+
+def browser_model_files() -> dict[str, str]:
+    return {name: face_models.MODELS[name][0] for name in BROWSER_MODELS}
 
 
 @st.cache_data(max_entries=50, show_spinner="Checking your photo…")

@@ -27,7 +27,9 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
+
+from skiniq.vision import face_models as fm
 
 from skiniq.vision.regions import FACE_SCORE_THRESHOLD, _get_detector
 
@@ -66,7 +68,7 @@ VISIBILITY = {
 
 LIGHTING = {
     "max_clipped": 0.10,       # share of skin pixels blown out to white
-    "max_crushed": 0.20,       # share of skin pixels crushed to black
+    "max_crushed": 0.20,       # share of skin pixels crushed to black (0.10 flagged well-lit darker skin)
     "max_side_diff": 30.0,     # left vs right cheek lightness difference (L*, 0-100); even across skin tones
 }
 
@@ -79,7 +81,16 @@ MESSAGES = {
     "turned": "Face the camera straight on, not turned to one side.",
     "sunglasses": "Sunglasses detected. Remove them so your eyes and the skin around them can be seen.",
     "glasses": "Glasses detected. Remove them so the skin around your eyes can be analysed.",
-    "mask": "Your nose, mouth or chin is covered (for example by a face mask). Remove anything covering your face.",
+    "mask": "Your nose or mouth is covered (for example by a face mask). Remove anything covering your face.",
+    "eye_hidden": "One or both of your eyes are closed or covered. Keep both eyes open, look at the camera, "
+                  "and move hair or hands away from them.",
+    "forehead_covered": "Your forehead is covered (by hair, a hat or a headband). Pull your hair back so your "
+                        "whole forehead shows.",
+    "hand": "A hand is touching or covering your face. Keep your hands away from your face.",
+    "unnatural_skin": "Your skin colour looks unnatural, as if covered by a sheet or clay mask or changed by a "
+                      "filter. Remove any mask and use a photo without filters.",
+    "greyscale": "This is a black-and-white photo. Use a colour photo so your skin can be analysed.",
+    "drawing": "This looks like a drawing, cartoon or illustration. Use a real photo of your face.",
     "eye_covered": "One of your eyes is covered. Move hair, hands or objects away and look at the camera.",
     "half_covered": "Part of your face is covered on one side. Move hair, hands or objects away from your face.",
     "too_dark": "The photo is too dark. Face a window or a light so your whole face is lit.",
@@ -107,7 +118,8 @@ class QualityReport:
 
 def settings() -> dict:
     """Thresholds shared with the browser camera guide."""
-    return {"framing": FRAMING, "visibility": VISIBILITY, "lighting": LIGHTING, "messages": MESSAGES}
+    return {"framing": FRAMING, "visibility": VISIBILITY, "lighting": LIGHTING, "messages": MESSAGES,
+            "parts": fm.PARTS, "hands": fm.HANDS}
 
 
 # ---- face alignment and region measurements ----------------------------------------------------
@@ -251,6 +263,33 @@ def framing_problems(face: np.ndarray, width: int, height: int) -> list[str]:
 
 # ---- the check ----------------------------------------------------------------------------------
 
+def model_problems(rgb: np.ndarray, face: np.ndarray, measures: dict[str, float]) -> list[str]:
+    """Problem codes from the trained models plus the lighting measures (raises ModelsUnavailable)."""
+    embedding = fm.clip_embedding(rgb)
+    if fm.clip_probability(embedding, "drawing") >= fm.clip_threshold("drawing"):
+        return ["drawing"]
+    grey = fm.is_greyscale(rgb)
+    parse = fm.parse_face(rgb, face)
+    parts = fm.parts_measures(parse)
+    measures.update({f"parts_{k}": v for k, v in parts.items()})
+    codes = ["greyscale"] if grey else []
+    codes += fm.parts_problems(parts, colour_photo=not grey)
+    hand, palm, conf = fm.hand_on_face(rgb, face)
+    clip_hand = fm.clip_probability(embedding, "hand")
+    measures.update(hand_palm=palm, hand_landmarks=conf, hand_clip=clip_hand)
+    if hand or clip_hand >= fm.clip_threshold("hand"):
+        codes.append("hand")
+    measures["highlights"] = fm.highlights(rgb)
+    li = LIGHTING
+    if measures["crushed"] > li["max_crushed"] or measures["highlights"] < fm.PARTS["min_highlights"]:
+        codes.append("too_dark")
+    elif measures["clipped"] > li["max_clipped"]:
+        codes.append("too_bright")
+    if measures["cheek_light_diff"] > li["max_side_diff"] and "hand" not in codes:
+        codes.append("uneven_light")
+    return codes
+
+
 def _faces(rgb: np.ndarray) -> np.ndarray:
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     h, w = bgr.shape[:2]
@@ -263,8 +302,12 @@ def _faces(rgb: np.ndarray) -> np.ndarray:
 
 
 def check_photo(image: Image.Image) -> QualityReport:
-    """Return whether the photo is good enough, with user-facing reasons if not."""
-    image = image.convert("RGB")
+    """Return whether the photo is good enough, with user-facing reasons if not.
+
+    Uses the trained models in skiniq.vision.face_models (face parts, hands, drawings); if they cannot
+    be downloaded, falls back to the rule-based visibility checks (face_visibility / visibility_problems).
+    """
+    image = ImageOps.exif_transpose(image).convert("RGB")   # phone photos store their rotation separately
     if min(image.size) < MIN_SIDE_PX:
         return QualityReport(False, [f"The photo is too small ({image.width}×{image.height} px). "
                                      f"Use a photo at least {MIN_SIDE_PX} px on its shortest side."],
@@ -292,9 +335,16 @@ def check_photo(image: Image.Image) -> QualityReport:
     if fw / scale < MIN_FACE_PX and "too_far" not in framing:
         framing.append("too_far")
     measures = face_visibility(rgb, face)
+    try:
+        visibility = model_problems(rgb, face, measures)
+    except fm.ModelsUnavailable:
+        visibility = visibility_problems(measures)      # rule-based fallback (offline)
+    if "drawing" in visibility:
+        return QualityReport(False, [MESSAGES["drawing"]], faces=len(faces), face_box=box, codes=["drawing"],
+                             measures={k: round(v, 4) for k, v in measures.items()})
     # something covering the face can shift the landmarks and look like a turned head: report it first
     pose = [c for c in framing if c in ("tilted", "turned")]
-    codes = [c for c in framing if c not in pose] + visibility_problems(measures) + pose
+    codes = [c for c in framing if c not in pose] + visibility + pose
 
     grey = cv2.cvtColor(rgb[box[1]:box[3], box[0]:box[2]], cv2.COLOR_RGB2GRAY)
     grey = cv2.resize(grey, (256, max(1, round(256 * grey.shape[0] / max(1, grey.shape[1])))))

@@ -87,6 +87,26 @@ def progress() -> None:
 
 # ---- step 1: photo ----------------------------------------------------------------------------
 
+def check_new_photo(photo: bytes, source: str) -> None:
+    """Run the photo check on a new upload or capture; keep it if accepted, explain why if not."""
+    try:
+        Image.open(io.BytesIO(photo)).verify()
+    except (UnidentifiedImageError, OSError):
+        st.error("That file isn't a readable image. Upload a JPG, PNG or WEBP photo.",
+                 title="Photo not accepted", icon=":material/no_photography:")
+        return
+    report = photo_quality(photo)
+    if report.ok:
+        ss.photo_bytes, ss.photo_from = photo, source
+        ss.nav_error = None
+        st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
+    else:
+        if ss.photo_from == source:
+            wizard.clear_photo()
+        st.error("\n".join(f"- {p}" for p in report.problems), title="Photo not accepted",
+                 icon=":material/no_photography:")
+
+
 def photo_step() -> None:
     st.title("Analyse my skin")
     progress()
@@ -95,34 +115,30 @@ def photo_step() -> None:
         "Photo", ["Upload a photo", "Take a photo"], default="Upload a photo", key="photo_source",
         label_visibility="collapsed", persist_state="session",
     )
-    if ss.photo_bytes:
+    if source == "Take a photo":
+        if not ss.photo_bytes:
+            st.markdown(PHOTO_RULES)
+        st.caption("Fit your head inside the outline with your shoulders below it. The outline turns green "
+                   "when your face is fully visible, straight on and evenly lit. Press Retake to try again.")
+        photo, retaken = face_camera(key=f"face_camera_{ss.photo_nonce}",
+                                     initial=ss.photo_bytes if ss.photo_from == "camera" else None)
+        if retaken and ss.photo_from == "camera":
+            wizard.clear_photo()
+        if photo and photo != ss.photo_bytes:
+            check_new_photo(photo, "camera")
+        elif photo:
+            st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
+    elif ss.photo_bytes and ss.photo_from == "upload":
         st.image(ss.photo_bytes, width=260, caption="Your photo")
         st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
         st.button("Use a different photo", icon=":material/refresh:", on_click=wizard.clear_photo)
     else:
         st.markdown(PHOTO_RULES)
-        if source == "Take a photo":
-            st.caption("Fit your head inside the outline with your shoulders below it. The outline turns green "
-                       "when your face is fully visible, straight on and evenly lit.")
-            photo = face_camera(key=f"face_camera_{ss.photo_nonce}")
-        else:
-            upload = st.file_uploader("Face photo framed like the camera outline: head and shoulders",
-                                      type=["jpg", "jpeg", "png", "webp"], key=f"photo_upload_{ss.photo_nonce}")
-            photo = upload.getvalue() if upload is not None else None
+        upload = st.file_uploader("Face photo framed like the camera outline: head and shoulders",
+                                  type=["jpg", "jpeg", "png", "webp"], key=f"photo_upload_{ss.photo_nonce}")
+        photo = upload.getvalue() if upload is not None else None
         if photo:
-            try:
-                Image.open(io.BytesIO(photo)).verify()
-            except (UnidentifiedImageError, OSError):
-                st.error("That file isn't a readable image. Upload a JPG, PNG or WEBP photo.",
-                         title="Photo not accepted", icon=":material/no_photography:")
-            else:
-                report = photo_quality(photo)
-                if report.ok:
-                    ss.photo_bytes = photo
-                    ss.nav_error = None
-                    st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
-                else:
-                    st.error(report.message, title="Photo not accepted", icon=":material/no_photography:")
+            check_new_photo(photo, "upload")
     location_section()
     nav(skip=True)
 

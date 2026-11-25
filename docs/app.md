@@ -60,19 +60,22 @@ All product photos can be browsed by category in the [product photo gallery](gal
 
 ## Photo: guided camera and quality check
 
-- **Same rules for camera and upload** (`skiniq/vision/quality.py`; details and calibration in
-  [photo_check.md](photo_check.md)). A photo is accepted only if it shows exactly one face that is:
-  framed **head and shoulders** like the camera outline (face 30–60% of the photo's height, centred, chin in the
-  upper 80%, not cut off), **straight on** (tilt ≤ 15°, not turned), **fully visible** (no sunglasses, glasses,
-  face mask, or hand, hair or object over an eye or one side), **evenly lit** (not blown out, not crushed, no
-  one-sided shadow), sharp, and at least 240 px. Each problem has its own message telling the user what to fix.
+- **Same checks for camera and upload** (`skiniq/vision/quality.py`, `skiniq/vision/face_models.py`; details,
+  models, licences and evaluation in [photo_check.md](photo_check.md)). A photo is accepted only if it is a real
+  colour photo (not a drawing) of exactly one face that is framed **head and shoulders** like the camera outline,
+  **straight on**, with **both eyes open**, **no glasses or sunglasses**, **no mask** (face mask, sheet or clay mask),
+  **no hand** on the face, the **forehead uncovered**, **evenly lit** (not dark, blown out or half in shadow), sharp,
+  and at least 240 px. Face parts are checked with a trained face-parsing model, hands with MediaPipe's palm and hand
+  models, drawings with CLIP. Each problem has its own message telling the user what to fix.
 - **Guided camera** (`app/components/camera.py`, a Streamlit custom component): live video with a head-and-shoulders
   outline. Face detection runs in the browser (YuNet via ONNX Runtime Web on the CPU, no WebGL needed; bundled in
   `app/static/facedetect/` and served with `server.enableStaticServing`). Every frame runs the same checks with the
-  same thresholds (passed from `quality.settings()`), so the outline is **red** with a hint while anything is
-  wrong (including a covered face) and turns **green** only after three frames in a row pass; only then is
-  "Take photo" enabled. The captured photo is exactly the picture inside the frame and is checked again on the
-  server.
+  same thresholds (passed from `quality.settings()`): YuNet every frame, face parsing and the palm detector about
+  every 0.6 s (in the browser, CPU). The outline stays red ("Loading face checks…") until those models have loaded,
+  is **red** with a hint while anything is wrong, and turns **green** only after three frames in a row pass with a
+  fresh face-part result; only then is "Take photo" enabled. After a capture the photo stays in the camera frame
+  with **Retake**, which restarts the live camera directly. The captured photo is exactly the picture inside the
+  frame and is checked again on the server.
 - **Upload**: the same check runs as soon as a photo is uploaded; a rejected photo shows "Photo not accepted"
   with every problem found, and the user cannot continue with it (they can upload another or press Skip).
 

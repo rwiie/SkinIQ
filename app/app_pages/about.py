@@ -30,6 +30,7 @@ st.markdown("""
 - Skin-Problem-Detection-Relabel-Clean3 (Roboflow Universe, CC BY 4.0)
 - Korean skincare product data (Skinsort via Kaggle)
 - Product photos: INKEEDecoder (formerly INCIDecoder), linked from each product card
+- Photo check models: YuNet face detector (OpenCV Zoo, MIT), BiSeNet face parsing (CelebAMask-HQ, non-commercial research and education), MediaPipe palm and hand models (Apache-2.0), CLIP (OpenAI, MIT)
 - Weather: OpenWeatherMap and Open-Meteo
 """)
 

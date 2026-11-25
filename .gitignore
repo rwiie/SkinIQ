@@ -17,6 +17,7 @@ data/processed/*
 !data/raw/products.csv
 !data/processed/.gitkeep
 models/*
+app/static/photo_check/
 !models/.gitkeep
 
 # Notebooks / OS

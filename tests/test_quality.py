@@ -164,7 +164,7 @@ def test_head_and_shoulders_selfie_is_accepted(framed):
 
 
 @pytest.mark.parametrize("kind, code", [
-    ("sunglasses", "sunglasses"), ("glasses", "glasses"), ("mask", "mask"), ("eye_covered", "eye_covered"),
+    ("sunglasses", "sunglasses"), ("mask", "mask"), ("eye_covered", "eye_hidden"),
 ])
 def test_covered_faces_are_rejected(framed, kind, code):
     photo, face = framed[0], framed[1]
@@ -172,9 +172,39 @@ def test_covered_faces_are_rejected(framed, kind, code):
     assert not r.ok and code in r.codes and q.MESSAGES[code] in r.message
 
 
+# Real dataset photos with genuine problems (the models are trained on real faces, so drawn-on glasses or
+# hands are not a fair test); paths under data/processed, skipped without the dataset.
+REAL_CASES = {
+    "hand": ("skin_type/train/normal/normal_f6e4461d9ab63dd8c1e6_jpg.rf.4f19202e50c3292d7312c3e4b8cfc3ff.jpg", "hand"),
+    "glasses": ("skin_type/train/dry/dry_new_d9cac0f138c33b674999_jpg.rf.a8dd6292433dce9cedf5b04af73210b0.jpg", "glasses"),
+    "sunglasses": ("skin_type/train/oily/oily_f3777e14df39fb4b57ab_jpg.rf.de90bb81ade9df0caf247c4d942dd4ca.jpg",
+                   "sunglasses"),
+    "eyes closed": ("skin_type/train/oily/oily_new_edd87f49dd25491258b8_jpg.rf.063ee5386f563a86ce27729a9813ac1c.jpg",
+                    "eye_hidden"),
+    "fringe": ("skin_type/train/dry/dry_058306bb9c7116981e12_jpg.rf.9919e7c263b9b14e2ae7496b3e1406aa.jpg",
+               "forehead_covered"),
+    "cap": ("skin_type/val/oily/oily_new_ba4897b430da14daf959_jpg.rf.fe0659da8a6673537742834c7cbc669d.jpg",
+            "forehead_covered"),
+}
+
+
+@pytest.mark.parametrize("case", list(REAL_CASES))
+def test_real_photos_with_problems_are_rejected_with_the_right_reason(case):
+    rel, code = REAL_CASES[case]
+    path = ROOT / "data/processed" / rel
+    if not path.exists():
+        pytest.skip("dataset not available")
+    img = Image.open(path).convert("RGB")
+    img.thumbnail((q.MAX_ANALYSIS_SIDE, q.MAX_ANALYSIS_SIDE))   # as check_photo does before detecting
+    rgb = np.asarray(img)
+    faces = q._faces(rgb)
+    r = check_photo(Image.fromarray(head_and_shoulders(rgb, max(faces, key=lambda f: f[2] * f[3]))))
+    assert not r.ok and code in r.codes and q.MESSAGES[code] in r.message
+
+
 def test_half_covered_face_is_rejected(framed):
     r = check_photo(Image.fromarray(draw_on_face(framed[0], framed[1], "dark_half")))
-    assert not r.ok and set(r.codes) & {"half_covered", "uneven_light", "no_face", "eye_covered"}
+    assert not r.ok and set(r.codes) & {"half_covered", "uneven_light", "no_face", "eye_hidden", "too_dark"}
 
 
 @pytest.mark.parametrize("make, code", [
