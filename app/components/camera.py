@@ -1,11 +1,17 @@
-"""Camera with a head-and-shoulders guide and live face detection (in the browser).
+"""Camera with a head-and-shoulders guide and live face checks (in the browser).
 
-The outline is red until exactly one face is centred in it at the right distance and in
-enough light, then turns green and the "Take photo" button is enabled. Face detection
-runs in the browser on the CPU with YuNet (the same detector as the server-side photo
-check) and ONNX Runtime Web, bundled in app/static/facedetect and served by Streamlit
-static serving. It needs no WebGL / graphics acceleration. If the detector cannot load, the guide stays grey, the photo
-can still be taken (the status line says why), and the server-side quality check (skiniq.vision.quality) decides.
+The outline is red, with a hint, until the face passes the same checks as an uploaded photo
+(skiniq.vision.quality): one face, framed head and shoulders inside the outline, head
+straight and facing the camera, nothing covering it (no sunglasses, glasses, mask, hand or
+hair over an eye or one side), and evenly lit. Only after three frames in a row pass does it
+turn green and enable "Take photo". The thresholds come from quality.settings(), so the guide
+and the server check agree; the captured photo is exactly the picture inside the frame and is
+checked again on the server.
+
+Face detection runs in the browser on the CPU with YuNet (the same detector as the server
+check) and ONNX Runtime Web, bundled in app/static/facedetect and served by Streamlit static
+serving. It needs no WebGL. If the detector cannot load, the guide stays grey, the photo can
+still be taken (the status line says why), and the server check decides.
 
 Result, kept in st.session_state[key]["photo"]: a JPEG data URL, or None after "Retake".
 """
@@ -15,6 +21,8 @@ from __future__ import annotations
 import base64
 
 import streamlit as st
+
+from skiniq.vision.quality import settings
 
 STATIC_BASE = "app/static/facedetect/"
 
@@ -70,13 +78,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 _JS = """
 const instances = new WeakMap();
 
-// Guide geometry in the 640x480 guide space (matches the SVG ellipse).
-const OVAL = { cx: 320, cy: 205, rx: 118, ry: 152 };
+// The visible picture is analysed as a 640x480 frame (the stage is 4:3, video uses object-fit: cover).
+const FRAME_W = 640, FRAME_H = 480;
+const PASS_FRAMES = 3;           // frames in a row that must pass before the outline turns green
 
 const LOAD_TIMEOUT_MS = 25000;   // ~11 MB of WebAssembly on first load
 const MAX_FRAME_ERRORS = 8;      // consecutive failed frames before falling back
 const IN_W = 320, IN_H = 256;    // detector input (multiples of 32); frames are letterboxed into it
-const SCORE_MIN = 0.6, NMS_IOU = 0.3;
+const SCORE_MIN = 0.7, NMS_IOU = 0.3;   // same face score threshold as the server check
 
 let detectorPromise = null;
 let detectorError = "";
@@ -105,23 +114,23 @@ function loadDetector(base) {
 }
 
 function iou(a, b) {
-  const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
-  const x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h);
+  const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]);
+  const x2 = Math.min(a[0] + a[2], b[0] + b[2]), y2 = Math.min(a[1] + a[3], b[1] + b[3]);
   const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-  return inter / (a.w * a.h + b.w * b.h - inter);
+  return inter / (a[2] * a[3] + b[2] * b[3] - inter);
 }
 
-// YuNet (OpenCV Zoo, 2023mar) on a letterboxed frame; returns faces in video pixels.
+// YuNet (OpenCV Zoo, 2023mar) on the 640x480 frame canvas. Returns faces as YuNet rows, like OpenCV:
+// [x, y, w, h, eye1 x, y, eye2 x, y, nose x, y, mouth1 x, y, mouth2 x, y, score] in frame pixels.
 function makeDetector(ort, session) {
   const canvas = document.createElement("canvas");
   canvas.width = IN_W; canvas.height = IN_H;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const input = new Float32Array(3 * IN_W * IN_H);
-  return async (video) => {
-    const vw = video.videoWidth, vh = video.videoHeight;
-    const sc = Math.min(IN_W / vw, IN_H / vh);
+  return async (frame) => {
+    const sc = Math.min(IN_W / frame.width, IN_H / frame.height);
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, IN_W, IN_H);
-    ctx.drawImage(video, 0, 0, vw * sc, vh * sc);
+    ctx.drawImage(frame, 0, 0, frame.width * sc, frame.height * sc);
     const px = ctx.getImageData(0, 0, IN_W, IN_H).data, n = IN_W * IN_H;
     for (let i = 0; i < n; i++) {  // planar BGR, 0-255 (as cv2.dnn.blobFromImage)
       input[i] = px[i * 4 + 2]; input[n + i] = px[i * 4 + 1]; input[2 * n + i] = px[i * 4];
@@ -129,62 +138,208 @@ function makeDetector(ort, session) {
     const out = await session.run({ input: new ort.Tensor("float32", input, [1, 3, IN_H, IN_W]) });
     const cands = [];
     for (const st of [8, 16, 32]) {
-      const cols = IN_W / st, cls = out["cls_" + st].data, obj = out["obj_" + st].data, bb = out["bbox_" + st].data;
+      const cols = IN_W / st, cls = out["cls_" + st].data, obj = out["obj_" + st].data;
+      const bb = out["bbox_" + st].data, kps = out["kps_" + st].data;
       for (let i = 0; i < cls.length; i++) {
         const score = Math.sqrt(Math.min(Math.max(cls[i], 0), 1) * Math.min(Math.max(obj[i], 0), 1));
         if (score < SCORE_MIN) continue;
         const r = Math.floor(i / cols), c = i % cols;
         const cx = (c + bb[i * 4]) * st, cy = (r + bb[i * 4 + 1]) * st;
         const w = Math.exp(bb[i * 4 + 2]) * st, h = Math.exp(bb[i * 4 + 3]) * st;
-        cands.push({ score, x: (cx - w / 2) / sc, y: (cy - h / 2) / sc, w: w / sc, h: h / sc });
+        const row = [(cx - w / 2) / sc, (cy - h / 2) / sc, w / sc, h / sc];
+        for (let k = 0; k < 5; k++) row.push((c + kps[i * 10 + 2 * k]) * st / sc, (r + kps[i * 10 + 2 * k + 1]) * st / sc);
+        row.push(score);
+        cands.push(row);
       }
     }
-    cands.sort((a, b) => b.score - a.score);
+    cands.sort((a, b) => b[14] - a[14]);
     const kept = [];
     for (const f of cands) if (kept.every((k) => iou(k, f) < NMS_IOU)) kept.push(f);
     // Like the server check: a much smaller face in the background is tolerated
-    const big = kept.length ? kept[0].w * kept[0].h : 0;
-    return kept.filter((f) => f.w * f.h >= 0.25 * big).map((f) => ({
-      score: f.score,
-      boundingBox: { originX: Math.max(0, f.x), originY: Math.max(0, f.y),
-                     width: Math.min(f.w, vw - Math.max(0, f.x)), height: Math.min(f.h, vh - Math.max(0, f.y)) },
-    }));
+    kept.sort((a, b) => b[2] * b[3] - a[2] * a[3]);
+    const big = kept.length ? kept[0][2] * kept[0][3] : 0;
+    return kept.filter((f) => f[2] * f[3] > 0.25 * big || f === kept[0]);
   };
 }
 
-// Map a box from video pixels into the 640x480 guide space (object-fit: cover, mirrored).
-function toGuide(box, vw, vh) {
-  const scale = Math.max(640 / vw, 480 / vh);
-  const ox = (640 - vw * scale) / 2, oy = (480 - vh * scale) / 2;
-  const cx = (box.originX + box.width / 2) * scale + ox;
-  return { cx: 640 - cx, cy: (box.originY + box.height / 2) * scale + oy, w: box.width * scale, h: box.height * scale };
+// ---- the same checks as skiniq/vision/quality.py (thresholds passed in from Python) ----------
+
+function landmarks(f) {
+  let e1 = [f[4], f[5]], e2 = [f[6], f[7]];
+  const [left, right] = e1[0] <= e2[0] ? [e1, e2] : [e2, e1];
+  return { left, right, nose: [f[8], f[9]], mouth: [(f[10] + f[12]) / 2, (f[11] + f[13]) / 2] };
 }
 
-function meanLuma(video, box, canvas) {
-  const s = 32;
-  canvas.width = s; canvas.height = s;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(video, box.originX, box.originY, box.width, box.height, 0, 0, s, s);
-  const px = ctx.getImageData(0, 0, s, s).data;
-  let sum = 0;
-  for (let i = 0; i < px.length; i += 4) sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-  return sum / (s * s);
+function framingProblems(f, width, height, F) {
+  const [x, y, w, h] = f, codes = [], m = F.edge_margin;
+  if (x < m * width || y < m * height || x + w > (1 - m) * width || y + h > (1 - m) * height) codes.push("cut_off");
+  const faceH = h / height;
+  if (faceH < F.min_face_height) codes.push("too_far");
+  else if (faceH > F.max_face_height || (y + h) / height > F.max_chin) {
+    codes.push("too_close");
+    if (codes[0] === "cut_off") codes.shift();   // an oversized face runs off the edges: moving back fixes both
+  }
+  const cx = (x + w / 2) / width, cy = (y + h / 2) / height;
+  if (!codes.includes("cut_off") && !(cx >= F.min_centre_x && cx <= F.max_centre_x &&
+                                      cy >= F.min_centre_y && cy <= F.max_centre_y)) codes.push("off_centre");
+  const { left, right, nose } = landmarks(f);
+  const d = Math.hypot(right[0] - left[0], right[1] - left[1]);
+  if (d > 0) {
+    if (Math.abs(Math.atan2(right[1] - left[1], right[0] - left[0]) * 180 / Math.PI) > F.max_roll_deg) codes.push("tilted");
+    if (Math.abs(nose[0] - (left[0] + right[0]) / 2) / d > F.max_yaw) codes.push("turned");
+  }
+  return codes;
 }
 
-function judge(faces, video, canvas) {
-  if (faces.length === 0) return ["red", "No face detected — look straight at the camera"];
-  if (faces.length > 1) return ["red", "More than one face — only you should be in the frame"];
-  const box = faces[0].boundingBox;
-  const g = toGuide(box, video.videoWidth, video.videoHeight);
-  const ovalW = OVAL.rx * 2;
-  if (Math.abs(g.cx - OVAL.cx) > OVAL.rx * 0.35 || Math.abs(g.cy - OVAL.cy) > OVAL.ry * 0.35)
-    return ["red", "Centre your face inside the outline"];
-  if (g.w < ovalW * 0.5) return ["red", "Move closer"];
-  if (g.w > ovalW * 1.15) return ["red", "Move back a little"];
-  const luma = meanLuma(video, box, canvas);
-  if (luma < 60) return ["red", "Too dark — face a window or a light"];
-  if (luma > 215) return ["red", "Too bright — avoid direct light on your face"];
-  return ["green", "Face detected — hold still and take the photo"];
+const CW = 192, CH = 224;
+const CANON = [[64, 80], [128, 80], [96, 152]];   // eyes and mouth centre in the aligned face
+const PATCHES = {
+  eye_l: [64, 80, 34, 18], eye_r: [128, 80, 34, 18], brow_mid: [96, 62, 22, 14], forehead: [96, 34, 64, 18],
+  cheek_l: [58, 122, 26, 24], cheek_r: [134, 122, 26, 24], nose: [96, 118, 18, 16], mouth: [96, 152, 40, 14],
+  chin: [96, 188, 36, 16], bridge: [96, 82, 14, 14], under_l: [64, 101, 34, 10], under_r: [128, 101, 34, 10],
+};
+
+// Affine transform taking three source points to three destination points: [a, b, c, d, e, f] for setTransform.
+function affine(src, dst) {
+  const [[x0, y0], [x1, y1], [x2, y2]] = src;
+  const det = x0 * (y1 - y2) - y0 * (x1 - x2) + (x1 * y2 - x2 * y1);
+  const solve = (v0, v1, v2) => [
+    (v0 * (y1 - y2) - y0 * (v1 - v2) + (v1 * y2 - v2 * y1)) / det,
+    (x0 * (v1 - v2) - v0 * (x1 - x2) + (x1 * v2 - x2 * v1)) / det,
+    (x0 * (y1 * v2 - y2 * v1) - y0 * (x1 * v2 - x2 * v1) + v0 * (x1 * y2 - x2 * y1)) / det,
+  ];
+  const [a, c, e] = solve(dst[0][0], dst[1][0], dst[2][0]);
+  const [b, d, f] = solve(dst[0][1], dst[1][1], dst[2][1]);
+  return [a, b, c, d, e, f];
+}
+
+function srgbToLab(r, g, b) {   // D65, as OpenCV's RGB2Lab: L* 0-100, a*, b*
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const R = lin(r), G = lin(g), B = lin(b);
+  const X = (0.412453 * R + 0.357580 * G + 0.180423 * B) / 0.950456;
+  const Y = 0.212671 * R + 0.715160 * G + 0.072169 * B;
+  const Z = (0.019334 * R + 0.119193 * G + 0.950227 * B) / 1.088754;
+  const fn = (t) => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const fx = fn(X), fy = fn(Y), fz = fn(Z);
+  return [Y > 0.008856 ? 116 * fy - 16 : 903.3 * Y, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+function median(values) { const v = Float32Array.from(values).sort(); const n = v.length; return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2; }
+function mean(values) { let s = 0; for (const x of values) s += x; return s / values.length; }
+function std(values) { const m = mean(values); let s = 0; for (const x of values) s += (x - m) * (x - m); return Math.sqrt(s / values.length); }
+
+function faceVisibility(frame, f, canon) {
+  const { left, right, mouth } = landmarks(f);
+  const ctx = canon.getContext("2d", { willReadFrequently: true });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, CW, CH);
+  ctx.setTransform(...affine([left, right, mouth], CANON));
+  ctx.drawImage(frame, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const px = ctx.getImageData(0, 0, CW, CH).data;
+  const n = CW * CH, L = new Float32Array(n), A = new Float32Array(n), B = new Float32Array(n), G = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = px[4 * i], g = px[4 * i + 1], b = px[4 * i + 2];
+    [L[i], A[i], B[i]] = srgbToLab(r, g, b);
+    G[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+  }
+  const region = (name, arr) => {
+    const [x, y, w, h] = PATCHES[name], out = [];
+    for (let yy = y - (h >> 1); yy < y + (h >> 1); yy++) for (let xx = x - (w >> 1); xx < x + (w >> 1); xx++) out.push(arr[yy * CW + xx]);
+    return out;
+  };
+  const med = {};
+  for (const name in PATCHES) med[name] = [median(region(name, L)), median(region(name, A)), median(region(name, B))];
+  const med3 = (names) => [0, 1, 2].map((k) => median(names.map((nm) => med[nm][k])));
+  const skin = med3(["cheek_l", "cheek_r", "nose"]), upper = med3(["brow_mid", "forehead"]), lower = med3(["nose", "mouth", "chin"]);
+  const skinL = Math.max(skin[0], 1), m = {};
+  for (const s of ["l", "r"]) {
+    const eye = region("eye_" + s, L);
+    m["eye_" + s + "_rel"] = mean(eye) / skinL;
+    m["eye_" + s + "_dark"] = mean(eye.map((v) => (v < 0.6 * skinL ? 1 : 0)));
+    m["eye_" + s + "_contrast"] = std(eye) / skinL;
+  }
+  const dist = (p, q) => Math.hypot(p[1] - q[1], p[2] - q[2]);
+  m.lower_colour_diff = dist(lower, upper);
+  m.lip_red = med.mouth[1] - upper[1];
+  m.mouth_texture = std(region("mouth", L)) / Math.max(upper[0], 1);
+  m.cheek_colour_diff = dist(med.cheek_l, med.cheek_r);
+  m.cheek_light_diff = Math.abs(med.cheek_l[0] - med.cheek_r[0]);
+  // Sobel 3x3 on the grey face (as cv2.Sobel, borders replicated)
+  const gx = new Float32Array(n), gy = new Float32Array(n), grad = new Float32Array(n);
+  const at = (x, y) => G[Math.min(CH - 1, Math.max(0, y)) * CW + Math.min(CW - 1, Math.max(0, x))];
+  for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
+    const i = y * CW + x;
+    gx[i] = Math.abs(at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1));
+    gy[i] = Math.abs(at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1));
+    grad[i] = Math.hypot(gx[i], gy[i]);
+  }
+  const cheekDetail = (mean(region("cheek_l", grad)) + mean(region("cheek_r", grad))) / 2 + 4;
+  m.bridge_edges = mean(region("bridge", grad)) / cheekDetail;
+  m.under_edges = Math.max(mean(region("under_l", gy)), mean(region("under_r", gy))) / cheekDetail;
+  const half = (x0, x1) => { let s = 0, c = 0; for (let y = 50; y < 200; y++) for (let x = x0; x < x1; x++) { s += grad[y * CW + x]; c++; } return s / c; };
+  const hl = half(30, 88), hr = half(104, 162);
+  m.half_texture_ratio = Math.min(hl, hr) / Math.max(hl, hr, 1e-6);
+  let clipped = 0, crushed = 0, total = 0;
+  for (const name of ["cheek_l", "cheek_r", "nose", "forehead"]) {
+    const [x, y, w, h] = PATCHES[name];
+    for (let yy = y - (h >> 1); yy < y + (h >> 1); yy++) for (let xx = x - (w >> 1); xx < x + (w >> 1); xx++) {
+      const i = 4 * (yy * CW + xx), r = px[i], g = px[i + 1], b = px[i + 2];
+      if (Math.min(r, g, b) >= 250) clipped++;
+      if (Math.max(r, g, b) <= 25) crushed++;
+      total++;
+    }
+  }
+  m.clipped = clipped / total; m.crushed = crushed / total;
+  return m;
+}
+
+function visibilityProblems(m, V, LI) {
+  const codes = [];
+  if (Math.max(m.eye_l_rel, m.eye_r_rel) < V.sunglasses_max_rel && Math.min(m.eye_l_dark, m.eye_r_dark) > V.sunglasses_min_dark) codes.push("sunglasses");
+  else if (m.bridge_edges > V.glasses_min_bridge_edges && m.under_edges > V.glasses_min_under_edges) codes.push("glasses");
+  if (["l", "r"].some((s) => m["eye_" + s + "_contrast"] < V.eye_min_contrast && m["eye_" + s + "_rel"] > V.eye_covered_min_rel)) codes.push("eye_covered");
+  if ((m.lower_colour_diff > V.mask_min_colour_diff && m.lip_red < V.mask_max_lip_red) ||
+      (m.mouth_texture < V.mask_max_mouth_texture && m.lip_red < V.mask_max_lip_red_flat)) {
+    codes.push("mask");
+    const g = codes.indexOf("glasses"); if (g >= 0) codes.splice(g, 1);
+  }
+  if ((m.cheek_colour_diff > V.half_max_colour_diff || m.half_texture_ratio < V.half_min_texture_ratio) && !codes.includes("eye_covered")) codes.push("half_covered");
+  if (m.crushed > LI.max_crushed) codes.push("too_dark");
+  else if (m.clipped > LI.max_clipped) codes.push("too_bright");
+  if (m.cheek_light_diff > LI.max_side_diff) codes.push("uneven_light");
+  return codes;
+}
+
+// Short hints for the live guide; other problems use the server check's messages.
+const LIVE_HINTS = {
+  too_far: "Move closer — fit your face in the outline",
+  too_close: "Move back — your head and shoulders should fit the outline",
+  off_centre: "Centre your face in the outline",
+  cut_off: "Move back or centre your face — your whole face must be inside the outline",
+  tilted: "Keep your head straight",
+  turned: "Face the camera straight on",
+};
+
+function judge(faces, frame, canon, S) {
+  if (faces.length === 0) return ["red", "No face detected — look straight at the camera with nothing covering your face", []];
+  if (faces.length > 1) return ["red", "More than one face — only you should be in the frame", ["several_faces"]];
+  const f = faces[0];
+  const framing = framingProblems(f, frame.width, frame.height, S.framing);
+  // Measure the face once it is placed in the outline (size and position OK). Something covering the
+  // face can also shift the landmarks and look like a turned or tilted head, so it is reported first.
+  const placed = framing.every((c) => c === "tilted" || c === "turned");
+  const codes = placed ? [...visibilityProblems(faceVisibility(frame, f, canon), S.visibility, S.lighting), ...framing] : framing;
+  if (codes.length) return ["red", LIVE_HINTS[codes[0]] || S.messages[codes[0]], codes];
+  return ["green", "Face detected — hold still and take the photo", []];
+}
+
+// The part of the video shown in the 4:3 stage (object-fit: cover), in video pixels.
+function visibleRegion(video) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const scale = Math.max(FRAME_W / vw, FRAME_H / vh);
+  const w = FRAME_W / scale, h = FRAME_H / scale;
+  return [(vw - w) / 2, (vh - h) / 2, w, h];
 }
 
 export default function (component) {
@@ -221,8 +376,12 @@ export default function (component) {
 
   const startLoop = () => {
     stopLoop();
-    const canvas = document.createElement("canvas");
-    let errors = 0;
+    const frame = document.createElement("canvas");
+    frame.width = FRAME_W; frame.height = FRAME_H;
+    const fctx = frame.getContext("2d", { willReadFrequently: true });
+    const canon = document.createElement("canvas");
+    canon.width = CW; canon.height = CH;
+    let errors = 0, passes = 0;
     const startedAt = performance.now();
     setState("red", "Looking for your face…");
     let busy = false;
@@ -234,22 +393,27 @@ export default function (component) {
       }
       const detect = inst.detector;
       busy = true;
-      let faces;
+      let verdict;
       try {
-        faces = await detect(video);
+        fctx.drawImage(video, ...visibleRegion(video), 0, 0, FRAME_W, FRAME_H);  // unmirrored, as captured
+        const faces = await detect(frame);
+        verdict = judge(faces, frame, canon, data.settings);
         errors = 0;
       } catch (e) {
         errors += 1;
-        console.warn("SkinIQ face detection failed on a frame:", e);
+        console.warn("SkinIQ face check failed on a frame:", e);
         if (errors >= MAX_FRAME_ERRORS) fallback((e && e.message) || "detection error");
         return;
       } finally {
         busy = false;
       }
       if (inst.detector !== detect || !inst.timer || root.classList.contains("captured")) return;
-      const [cls, text] = judge(faces, video, canvas);
-      inst.aligned = cls === "green";
-      setState(cls, text);
+      const [cls, text, codes] = verdict;
+      inst.lastCodes = codes;
+      passes = cls === "green" ? passes + 1 : 0;
+      inst.aligned = passes >= PASS_FRAMES;
+      if (cls === "green" && !inst.aligned) setState("red", "Hold still…");
+      else setState(cls, text);
       shoot.disabled = !inst.aligned;
     }, 120);
   };
@@ -285,9 +449,10 @@ export default function (component) {
 
   shoot.onclick = () => {
     if (shoot.disabled || video.readyState < 2) return;
+    const [sx, sy, sw, sh] = visibleRegion(video);   // exactly what the guide checked
     const c = document.createElement("canvas");
-    c.width = video.videoWidth; c.height = video.videoHeight;
-    c.getContext("2d").drawImage(video, 0, 0);
+    c.width = Math.round(sw); c.height = Math.round(sh);
+    c.getContext("2d").drawImage(video, sx, sy, sw, sh, 0, 0, c.width, c.height);
     const url = c.toDataURL("image/jpeg", 0.92);
     stopCamera();
     still.src = url; still.hidden = false; video.hidden = true;
@@ -319,7 +484,7 @@ _CAMERA = st.components.v2.component("skiniq_camera", html=_HTML, css=_CSS, js=_
 def face_camera(key: str = "face_camera") -> bytes | None:
     """Show the guided camera; return the captured JPEG bytes, or None."""
     current = (st.session_state.get(key) or {}).get("photo")
-    result = _CAMERA(key=key, data={"photo": current, "static_base": STATIC_BASE},
+    result = _CAMERA(key=key, data={"photo": current, "static_base": STATIC_BASE, "settings": settings()},
                      on_photo_change=lambda: None)
     url = result.photo  # state persists across reruns; None before a capture and after "Retake"
     if not url or "," not in url:

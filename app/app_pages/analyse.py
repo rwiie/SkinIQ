@@ -15,6 +15,9 @@ from skiniq.report import build_pdf
 
 SINGLE_CHOICE_INLINE_MAX = 22  # longest option label shown as a segmented control
 PHOTO_PX = 140  # product photo square on the routine cards
+PHOTO_RULES = (":material/check: Head and shoulders, facing the camera  \n"
+               ":material/check: Nothing covering your face: no glasses, sunglasses, mask, hands or hair  \n"
+               ":material/check: Even light on both sides, no makeup or filters")
 
 wizard.init()
 ss = st.session_state
@@ -97,12 +100,13 @@ def photo_step() -> None:
         st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
         st.button("Use a different photo", icon=":material/refresh:", on_click=wizard.clear_photo)
     else:
+        st.markdown(PHOTO_RULES)
         if source == "Take a photo":
-            st.caption("Fit your face inside the outline. It turns green when your face is detected and "
-                       "positioned well.")
+            st.caption("Fit your head inside the outline with your shoulders below it. The outline turns green "
+                       "when your face is fully visible, straight on and evenly lit.")
             photo = face_camera(key=f"face_camera_{ss.photo_nonce}")
         else:
-            upload = st.file_uploader("Face photo (front-facing, no makeup or filters, good light)",
+            upload = st.file_uploader("Face photo framed like the camera outline: head and shoulders",
                                       type=["jpg", "jpeg", "png", "webp"], key=f"photo_upload_{ss.photo_nonce}")
             photo = upload.getvalue() if upload is not None else None
         if photo:
