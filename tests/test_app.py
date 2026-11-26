@@ -190,7 +190,7 @@ def test_about_page():
 def test_rejected_upload_is_not_analysed(monkeypatch):
     from skiniq.vision.quality import QualityReport
 
-    monkeypatch.setattr(services, "check_photo", lambda img: QualityReport(False, ["No face was detected."]))
+    monkeypatch.setattr(services, "check_photo", lambda img, source="camera": QualityReport(False, ["No face was detected."]))
     services.photo_quality.clear()
     import io
 

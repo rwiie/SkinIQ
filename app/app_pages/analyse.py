@@ -15,9 +15,11 @@ from skiniq.report import build_pdf
 
 SINGLE_CHOICE_INLINE_MAX = 22  # longest option label shown as a segmented control
 PHOTO_PX = 140  # product photo square on the routine cards
-PHOTO_RULES = (":material/check: Head and shoulders, facing the camera  \n"
-               ":material/check: Nothing covering your face: no glasses, sunglasses, mask, hands or hair  \n"
-               ":material/check: Even light on both sides, no makeup or filters")
+_PHOTO_RULES_REST = (":material/check: Nothing covering your face: no glasses, sunglasses, mask, hands or hair  \n"
+                     ":material/check: Even light on both sides, no makeup or filters")
+PHOTO_RULES = ":material/check: Head and shoulders, facing the camera  \n" + _PHOTO_RULES_REST
+UPLOAD_RULES = (":material/check: Your whole face in the photo, centred and looking straight at the camera "
+                "(a close-up is fine)  \n" + _PHOTO_RULES_REST)
 
 wizard.init()
 ss = st.session_state
@@ -95,7 +97,7 @@ def check_new_photo(photo: bytes, source: str) -> None:
         st.error("That file isn't a readable image. Upload a JPG, PNG or WEBP photo.",
                  title="Photo not accepted", icon=":material/no_photography:")
         return
-    report = photo_quality(photo)
+    report = photo_quality(photo, source)
     if report.ok:
         ss.photo_bytes, ss.photo_from = photo, source
         ss.nav_error = None
@@ -133,8 +135,8 @@ def photo_step() -> None:
         st.success("Photo accepted: one clear face detected.", icon=":material/check_circle:")
         st.button("Use a different photo", icon=":material/refresh:", on_click=wizard.clear_photo)
     else:
-        st.markdown(PHOTO_RULES)
-        upload = st.file_uploader("Face photo framed like the camera outline: head and shoulders",
+        st.markdown(UPLOAD_RULES)
+        upload = st.file_uploader("Face photo: your whole face, centred and looking straight ahead",
                                   type=["jpg", "jpeg", "png", "webp"], key=f"photo_upload_{ss.photo_nonce}")
         photo = upload.getvalue() if upload is not None else None
         if photo:

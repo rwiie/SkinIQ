@@ -37,7 +37,8 @@ If the models cannot be downloaded, the server falls back to the earlier rule-ba
 | Black-and-white photo | 90th percentile HSV saturation of the photo | < 25 |
 | Too dark | The brightest 5% of the photo (L\*) is dim (in a well-lit photo something is bright whatever the skin tone), or > 20% of skin pixels crushed to black | < 65 |
 | Too bright / one side in shadow | Skin pixels blown out; cheek lightness differs | > 10%; > 30 L\* |
-| Framing and pose (unchanged) | Face 30–60% of the photo height, centred, not cut off; tilt ≤ 15°, not turned | `FRAMING` |
+| Framing and pose: **captured photos** | Head and shoulders: face 30–60% of the photo height, chin above 80%, centred, not cut off; tilt ≤ 15°, not turned | `FRAMING` (same in the camera guide) |
+| Framing and pose: **uploaded photos** | A close-up is fine (no neck or shoulders needed): face ≥ 30% of the photo height with room of 8% of the face size on every side, so the whole face is in the photo; centred (x 35–65%, y 25–65%); tilt ≤ 15°, not turned | `UPLOAD_FRAMING` |
 
 Phone photos are rotated by their EXIF orientation before checking.
 

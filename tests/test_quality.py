@@ -82,6 +82,19 @@ def test_head_and_shoulders_framing(face, codes):
     assert framing_problems(face, 640, 480) == codes
 
 
+@pytest.mark.parametrize("face, codes", [
+    (_face(h=0.75, cy=0.5), []),                        # a close-up of the whole face is fine for uploads
+    (_face(h=0.6, cy=0.62), []),                        # chin near the bottom, no neck: fine
+    (_face(h=0.9, cy=0.5), ["cut_off"]),                # forehead or chin outside the photo
+    (_face(h=0.6, cx=0.72, cy=0.5), ["off_centre"]),
+    (_face(h=0.2), ["too_far"]),
+    (_face(h=0.6, cy=0.5, roll=25), ["tilted"]),
+    (_face(h=0.6, cy=0.5, yaw=0.4), ["turned"]),
+])
+def test_upload_framing_allows_close_ups_but_needs_a_whole_centred_straight_face(face, codes):
+    assert framing_problems(face, 640, 480, q.UPLOAD_FRAMING) == codes
+
+
 def test_portrait_photos_use_the_same_framing():
     assert framing_problems(_face(width=900, height=1200), 900, 1200) == []
     assert framing_problems(_face(h=0.8, width=900, height=1200), 900, 1200) == ["too_close"]
@@ -231,6 +244,13 @@ def test_face_close_up_is_rejected_as_too_close(framed):
     _, _, rgb, face = framed
     r = check_photo(Image.fromarray(head_and_shoulders(rgb, face, face_height=0.75)))
     assert not r.ok and "too_close" in r.codes and q.MESSAGES["too_close"] in r.message
+
+
+def test_uploaded_close_up_is_accepted_but_captured_close_up_is_not(framed):
+    _, _, rgb, face = framed
+    close_up = Image.fromarray(head_and_shoulders(rgb, face, face_height=0.65))   # whole face, no shoulders
+    assert check_photo(close_up, source="upload").ok
+    assert "too_close" in check_photo(close_up, source="camera").codes
 
 
 def test_face_far_away_is_rejected_as_too_far(framed):

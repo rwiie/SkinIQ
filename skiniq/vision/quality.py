@@ -50,6 +50,16 @@ FRAMING = {
     "max_yaw": 0.25,           # nose off the eye midline, as a share of the eye distance (~15°): head turned
 }
 
+# Uploaded photos: a close-up is fine (no need to show the neck or shoulders), but the whole face must be in
+# the photo with a little room around it, centred and facing the camera. Captured photos keep FRAMING.
+UPLOAD_FRAMING = {
+    **FRAMING,
+    "max_face_height": 1.0,    # no "too close" limit
+    "max_chin": 1.0,           # the chin may be near the bottom (neck not needed)
+    "max_centre_y": 0.65,      # a close-up face sits around the middle of the photo
+    "face_margin": 0.08,       # room around the face box, as a share of the face size (forehead and chin in frame)
+}
+
 # Visibility of the face (measured on the aligned face; see face_visibility)
 VISIBILITY = {
     "eye_min_contrast": 0.06,        # eye contrast / skin lightness below this = eye covered...
@@ -232,18 +242,20 @@ def visibility_problems(m: dict[str, float]) -> list[str]:
     return codes
 
 
-def framing_problems(face: np.ndarray, width: int, height: int) -> list[str]:
-    """Problem codes for head-and-shoulders framing and head pose."""
-    f = FRAMING
+def framing_problems(face: np.ndarray, width: int, height: int, framing: dict | None = None) -> list[str]:
+    """Problem codes for framing and head pose (head and shoulders by default; UPLOAD_FRAMING for uploads)."""
+    f = FRAMING if framing is None else framing
     x, y, w, h = (float(v) for v in face[:4])
     codes = []
-    margin = f["edge_margin"]
-    if x < margin * width or y < margin * height or x + w > (1 - margin) * width or y + h > (1 - margin) * height:
+    mx = max(f["edge_margin"] * width, f.get("face_margin", 0.0) * w)
+    my = max(f["edge_margin"] * height, f.get("face_margin", 0.0) * h)
+    if x < mx or y < my or x + w > width - mx or y + h > height - my:
         codes.append("cut_off")
     face_h = h / height
     if face_h < f["min_face_height"]:
         codes.append("too_far")
-    elif face_h > f["max_face_height"] or (y + h) / height > f["max_chin"]:
+    elif (f["max_face_height"] < 1.0 or f["max_chin"] < 1.0) and (
+            face_h > f["max_face_height"] or (y + h) / height > f["max_chin"]):
         codes.append("too_close")
         if "cut_off" in codes:  # an oversized face runs off the edges: moving back fixes both
             codes.remove("cut_off")
@@ -301,8 +313,11 @@ def _faces(rgb: np.ndarray) -> np.ndarray:
     return faces[faces[:, -1] >= FACE_SCORE_THRESHOLD]
 
 
-def check_photo(image: Image.Image) -> QualityReport:
+def check_photo(image: Image.Image, source: str = "camera") -> QualityReport:
     """Return whether the photo is good enough, with user-facing reasons if not.
+
+    ``source="upload"`` relaxes the framing (UPLOAD_FRAMING: a close-up of the whole face is fine);
+    ``"camera"`` (captured photos) keeps head-and-shoulders framing, as the camera guide shows.
 
     Uses the trained models in skiniq.vision.face_models (face parts, hands, drawings); if they cannot
     be downloaded, falls back to the rule-based visibility checks (face_visibility / visibility_problems).
@@ -331,7 +346,9 @@ def check_photo(image: Image.Image) -> QualityReport:
     w, h = image.size
     box = (max(0, int(x)), max(0, int(y)), min(w, int(x + fw)), min(h, int(y + fh)))
 
-    framing = framing_problems(face, w, h)
+    if source not in ("camera", "upload"):
+        raise ValueError(f"unknown photo source: {source}")
+    framing = framing_problems(face, w, h, UPLOAD_FRAMING if source == "upload" else FRAMING)
     if fw / scale < MIN_FACE_PX and "too_far" not in framing:
         framing.append("too_far")
     measures = face_visibility(rgb, face)

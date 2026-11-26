@@ -111,7 +111,8 @@ def browser_model_files() -> dict[str, str]:
 
 
 @st.cache_data(max_entries=50, show_spinner="Checking your photo…")
-def photo_quality(photo: bytes) -> QualityReport:
+def photo_quality(photo: bytes, source: str = "camera") -> QualityReport:
+    """Photo check; ``source`` is "upload" (close-ups allowed) or "camera" (head and shoulders)."""
     import io
 
-    return check_photo(Image.open(io.BytesIO(photo)))
+    return check_photo(Image.open(io.BytesIO(photo)), source=source)
