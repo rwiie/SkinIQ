@@ -22,6 +22,11 @@ MODEL_URL = os.environ.get(
     "https://drive.usercontent.google.com/download?id=1uGmAZtnQp62_kSLDpwrxu0Rh5LB52CJn&export=download&confirm=t",
 )
 MODEL_SHA256 = "41eb371460564dff080c1e1dd5062798c55746a48b7ba5141fd717a34540581a"
+# v2 is run with test-time augmentation (the photo and its mirror image, averaged). Thresholds for that
+# set-up were re-tuned on the validation photos (max F1 per concern), as in training; on the test photos
+# this raised macro F1 from 0.661 to 0.688 (training/results/skin_concerns_v2_tta/).
+TTA_THRESHOLDS = {"acne": 0.55, "blackheads": 0.35, "hyperpigmentation": 0.30, "redness": 0.55,
+                  "enlarged_pores": 0.45, "wrinkles": 0.30}
 TIMEOUT_S = 60
 
 

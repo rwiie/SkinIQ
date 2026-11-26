@@ -1,0 +1,4 @@
+setup,macro_f1,micro_f1,exact_match,hamming_loss,clear_false_alarm_rate,mean_roc_auc,f1_acne,f1_blackheads,f1_hyperpigmentation,f1_redness,f1_enlarged_pores,f1_wrinkles
+no TTA (v2 as trained),0.6611,0.6771,0.3586,0.1737,0.1724,0.8508,0.7732,0.6557,0.575,0.6329,0.697,0.6329
+mirror TTA (app),0.6883,0.707,0.4051,0.1533,0.1034,0.8523,0.8103,0.76,0.5679,0.6329,0.6963,0.6623
+mirror + 90% crop TTA,0.6853,0.7022,0.4051,0.1533,0.1034,0.8543,0.8144,0.7379,0.6053,0.642,0.6769,0.6351

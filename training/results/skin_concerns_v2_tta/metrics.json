@@ -1,0 +1,25 @@
+{
+  "model": "skin_concerns_v2 (unchanged weights)",
+  "tta": "average of the photo and its mirror image",
+  "thresholds": "re-tuned on the 200 validation photos (max F1 per concern, grid 0.05-0.95), as in training",
+  "test": {
+    "photos": 237,
+    "macro_f1": 0.6883,
+    "micro_f1": 0.707,
+    "exact_match": 0.4051,
+    "hamming_loss": 0.1533,
+    "clear_photos": 29,
+    "clear_false_alarm_rate": 0.1034,
+    "multi_concern_photos": 121
+  },
+  "test_v2_without_tta": {
+    "photos": 237,
+    "macro_f1": 0.6611,
+    "micro_f1": 0.6771,
+    "exact_match": 0.3586,
+    "hamming_loss": 0.1737,
+    "clear_photos": 29,
+    "clear_false_alarm_rate": 0.1724,
+    "multi_concern_photos": 121
+  }
+}

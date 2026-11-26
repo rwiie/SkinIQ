@@ -90,6 +90,7 @@ class SkinClassifier:
     device: torch.device
     multilabel: bool = False                  # sigmoid outputs (independent concerns)
     thresholds: dict[str, float] | None = None  # per-concern decision thresholds (multi-label)
+    tta: bool = False                          # average the photo and its mirror image
 
     @classmethod
     def load(cls, path: str | Path, device: str | None = None) -> "SkinClassifier":
@@ -108,7 +109,9 @@ class SkinClassifier:
         Single-label models: probabilities sum to 1 (softmax). Multi-label models: each
         concern has its own independent probability (sigmoid).
         """
-        x = eval_transform(self.image_size)(image.convert("RGB")).unsqueeze(0).to(self.device)
-        logits = self.model(x)[0]
-        probs = (logits.sigmoid() if self.multilabel else logits.softmax(dim=0)).tolist()
+        image = image.convert("RGB")
+        views = [image, image.transpose(Image.FLIP_LEFT_RIGHT)] if self.tta else [image]
+        x = torch.stack([eval_transform(self.image_size)(v) for v in views]).to(self.device)
+        logits = self.model(x)
+        probs = (logits.sigmoid() if self.multilabel else logits.softmax(dim=1)).mean(dim=0).tolist()
         return dict(sorted(zip(self.labels, probs), key=lambda kv: kv[1], reverse=True))

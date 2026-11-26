@@ -125,6 +125,38 @@ def test_multilabel_checkpoint_gives_independent_probabilities(tmp_path):
     assert sum(probs.values()) != pytest.approx(1.0, abs=1e-3)  # sigmoid, not softmax
 
 
+def test_mirror_tta_averages_the_photo_and_its_mirror(tmp_path):
+    from skiniq.config import SKIN_CONDITIONS
+    from skiniq.vision.model import build_model
+
+    torch.manual_seed(0)
+    model = build_model(6, "tf_efficientnetv2_b0", pretrained=False)
+    torch.save({"state_dict": model.state_dict(), "labels": list(SKIN_CONDITIONS),
+                "model_name": "tf_efficientnetv2_b0", "image_size": 32, "multilabel": True}, tmp_path / "ml.pt")
+    clf = SkinClassifier.load(tmp_path / "ml.pt", device="cpu")
+    img = Image.new("RGB", (64, 64), (200, 150, 120))
+    img.paste((40, 20, 20), (0, 0, 20, 64))                     # asymmetric: the mirror image differs
+    plain, mirrored = clf.predict(img), clf.predict(img.transpose(Image.FLIP_LEFT_RIGHT))
+    clf.tta = True
+    both = clf.predict(img)
+    for c in SKIN_CONDITIONS:
+        assert both[c] == pytest.approx((plain[c] + mirrored[c]) / 2, abs=1e-5)
+
+
+def test_app_model_uses_tta_with_its_own_thresholds():
+    from skiniq import pipeline
+    from skiniq.vision import weights
+
+    from skiniq.config import SKIN_CONDITIONS
+
+    assert set(weights.TTA_THRESHOLDS) == set(SKIN_CONDITIONS)
+    if not weights.SKIN_CONCERN_MODEL.exists():
+        pytest.skip("app model not downloaded")
+    pipeline._CLASSIFIERS.clear()
+    clf = pipeline.load_classifier(download=False)
+    assert clf.tta and clf.thresholds == weights.TTA_THRESHOLDS
+
+
 @pytest.mark.parametrize("notebook", sorted((ROOT / "training").glob("*.ipynb")), ids=lambda p: p.name)
 def test_notebook_code_cells_are_valid_python(notebook):
     """Colab cells (including !shell and %magic lines) must at least parse."""

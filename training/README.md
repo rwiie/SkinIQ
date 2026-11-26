@@ -49,6 +49,11 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   raising the fully-labelled training files from 680 (265 photos) to 1,067 (406 photos). v3 was
   trained with `train_multilabel_colab.ipynb` (saved to `models/skin_concerns_v3/`, compared with v2).
   Afterwards the author relabelled all 1,099 Claude-labelled photos in `annotate_colab.ipynb` section 2b.
+- **v2 with test-time augmentation (what the app runs).** The v2 weights are unchanged; the app averages
+  each photo with its mirror image and uses thresholds re-tuned on the validation photos
+  (`skiniq/vision/weights.py`, `TTA_THRESHOLDS`). On the same 237 test photos: macro F1 0.661 → **0.688**,
+  micro F1 0.677 → 0.707, exact match 35.9% → 40.5%, clear-skin false alarms 17.2% → 10.3%
+  (`results/skin_concerns_v2_tta/`). Adding 90% crops as well gave no further gain (0.685).
 - **v3 result and decision: the app keeps v2.** On the same 237 test photos v3 tied v2 on macro F1
   (0.661) and mean ROC-AUC (0.850 vs 0.851); it cut clear-skin false alarms (17.2% → 6.9%) and improved
   acne (F1 0.77 → 0.82), but lowered hyperpigmentation (0.58 → 0.54) and enlarged pores (0.70 → 0.64).

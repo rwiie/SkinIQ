@@ -44,7 +44,7 @@ def load_classifier(path: str | Path | None = None, download: bool = True):
     key = str(path)
     if key in _CLASSIFIERS:
         return _CLASSIFIERS[key]
-    from skiniq.vision.weights import ModelUnavailable, ensure_model
+    from skiniq.vision.weights import MODEL_SHA256, TTA_THRESHOLDS, ModelUnavailable, ensure_model, sha256
 
     LAST_MODEL_ERROR.clear()
     try:
@@ -54,7 +54,11 @@ def load_classifier(path: str | Path | None = None, download: bool = True):
             raise ModelUnavailable(f"model file not found at {path}")
         from skiniq.vision.model import SkinClassifier
 
-        _CLASSIFIERS[key] = SkinClassifier.load(path)
+        clf = SkinClassifier.load(path)
+        if Path(path) == SKIN_CONCERN_MODEL and clf.multilabel and sha256(Path(path)) == MODEL_SHA256:
+            # the app's v2 model: run with test-time augmentation and its matching thresholds
+            clf.tta, clf.thresholds = True, dict(TTA_THRESHOLDS)
+        _CLASSIFIERS[key] = clf
     except ModelUnavailable as e:
         LAST_MODEL_ERROR.append(str(e))
         return None
