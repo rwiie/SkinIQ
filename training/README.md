@@ -49,6 +49,11 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   raising the fully-labelled training files from 680 (265 photos) to 1,067 (406 photos). Review them in
   `annotate_colab.ipynb` section 2b, then run `train_multilabel_colab.ipynb`, which saves to
   `models/skin_concerns_v3/` and compares with v2.
+- **v3 result and decision: the app keeps v2.** On the same 237 test photos v3 tied v2 on macro F1
+  (0.661) and mean ROC-AUC (0.850 vs 0.851); it cut clear-skin false alarms (17.2% → 6.9%) and improved
+  acne (F1 0.77 → 0.82), but lowered hyperpigmentation (0.58 → 0.54) and enlarged pores (0.70 → 0.64).
+  With no gain in overall detection, v2 stays in the app; v3 is reported as an experiment
+  (`results/skin_concerns_v3/`).
 - **Unlabelled close-ups and Roboflow images still train the model:** their folder concern or
   boxed concerns are known positives; their other concerns are weak negatives (loss weight 0.1).
   Unlabelled full faces are skipped.
