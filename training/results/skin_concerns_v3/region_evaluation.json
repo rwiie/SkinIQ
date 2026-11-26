@@ -1,0 +1,607 @@
+{
+  "all": {
+    "whole": {
+      "overall": {
+        "photos": 237,
+        "macro_f1": 0.6573,
+        "micro_f1": 0.6819,
+        "exact_match": 0.384,
+        "hamming_loss": 0.1667,
+        "clear_photos": 29,
+        "clear_false_alarm_rate": 0.069,
+        "multi_concern_photos": 121
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.7864,
+          "recall": 0.8526,
+          "f1": 0.8182,
+          "roc_auc": 0.9047,
+          "pr_auc": 0.8815,
+          "positives": 95,
+          "negatives": 142
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.5522,
+          "recall": 0.8605,
+          "f1": 0.6727,
+          "roc_auc": 0.9383,
+          "pr_auc": 0.8475,
+          "positives": 43,
+          "negatives": 194
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.7407,
+          "recall": 0.4167,
+          "f1": 0.5333,
+          "roc_auc": 0.7927,
+          "pr_auc": 0.6637,
+          "positives": 48,
+          "negatives": 189
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.8966,
+          "recall": 0.5,
+          "f1": 0.642,
+          "roc_auc": 0.8204,
+          "pr_auc": 0.7172,
+          "positives": 52,
+          "negatives": 185
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.6981,
+          "recall": 0.5692,
+          "f1": 0.6271,
+          "roc_auc": 0.8784,
+          "pr_auc": 0.7189,
+          "positives": 65,
+          "negatives": 172
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.6543,
+          "recall": 0.6463,
+          "f1": 0.6503,
+          "roc_auc": 0.7691,
+          "pr_auc": 0.7147,
+          "positives": 82,
+          "negatives": 155
+        }
+      }
+    },
+    "region": {
+      "overall": {
+        "photos": 237,
+        "macro_f1": 0.5734,
+        "micro_f1": 0.5795,
+        "exact_match": 0.2025,
+        "hamming_loss": 0.2918,
+        "clear_photos": 29,
+        "clear_false_alarm_rate": 0.8621,
+        "multi_concern_photos": 121
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.5176,
+          "recall": 0.9263,
+          "f1": 0.6642,
+          "roc_auc": 0.7829,
+          "pr_auc": 0.6876,
+          "positives": 95,
+          "negatives": 142
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.2597,
+          "recall": 0.9302,
+          "f1": 0.4061,
+          "roc_auc": 0.8505,
+          "pr_auc": 0.5564,
+          "positives": 43,
+          "negatives": 194
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.403,
+          "recall": 0.5625,
+          "f1": 0.4696,
+          "roc_auc": 0.7687,
+          "pr_auc": 0.6425,
+          "positives": 48,
+          "negatives": 189
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.75,
+          "recall": 0.5192,
+          "f1": 0.6136,
+          "roc_auc": 0.7353,
+          "pr_auc": 0.6678,
+          "positives": 52,
+          "negatives": 185
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.6308,
+          "recall": 0.6308,
+          "f1": 0.6308,
+          "roc_auc": 0.8145,
+          "pr_auc": 0.663,
+          "positives": 65,
+          "negatives": 172
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.5727,
+          "recall": 0.7683,
+          "f1": 0.6562,
+          "roc_auc": 0.8006,
+          "pr_auc": 0.7591,
+          "positives": 82,
+          "negatives": 155
+        }
+      }
+    }
+  },
+  "full faces": {
+    "whole": {
+      "overall": {
+        "photos": 49,
+        "macro_f1": 0.2897,
+        "micro_f1": 0.4324,
+        "exact_match": 0.6531,
+        "hamming_loss": 0.0714,
+        "clear_photos": 29,
+        "clear_false_alarm_rate": 0.069,
+        "multi_concern_photos": 4
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1": 0.6667,
+          "roc_auc": 0.9889,
+          "pr_auc": 0.9167,
+          "positives": 4,
+          "negatives": 45
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": NaN,
+          "pr_auc": NaN,
+          "positives": 0,
+          "negatives": 49
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": 0.7171,
+          "pr_auc": 0.2783,
+          "positives": 6,
+          "negatives": 43
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.5,
+          "recall": 0.6667,
+          "f1": 0.5714,
+          "roc_auc": 0.942,
+          "pr_auc": 0.5,
+          "positives": 3,
+          "negatives": 46
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": NaN,
+          "pr_auc": NaN,
+          "positives": 0,
+          "negatives": 49
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 1.0,
+          "recall": 0.3333,
+          "f1": 0.5,
+          "roc_auc": 0.7523,
+          "pr_auc": 0.6912,
+          "positives": 12,
+          "negatives": 37
+        }
+      }
+    },
+    "region": {
+      "overall": {
+        "photos": 49,
+        "macro_f1": 0.2821,
+        "micro_f1": 0.25,
+        "exact_match": 0.102,
+        "hamming_loss": 0.3878,
+        "clear_photos": 29,
+        "clear_false_alarm_rate": 0.8621,
+        "multi_concern_photos": 4
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.0976,
+          "recall": 1.0,
+          "f1": 0.1778,
+          "roc_auc": 0.8,
+          "pr_auc": 0.2958,
+          "positives": 4,
+          "negatives": 45
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": NaN,
+          "pr_auc": NaN,
+          "positives": 0,
+          "negatives": 49
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.2,
+          "recall": 0.5,
+          "f1": 0.2857,
+          "roc_auc": 0.6395,
+          "pr_auc": 0.3335,
+          "positives": 6,
+          "negatives": 43
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1": 0.6667,
+          "roc_auc": 0.9783,
+          "pr_auc": 0.7556,
+          "positives": 3,
+          "negatives": 46
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "roc_auc": NaN,
+          "pr_auc": NaN,
+          "positives": 0,
+          "negatives": 49
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.45,
+          "recall": 0.75,
+          "f1": 0.5625,
+          "roc_auc": 0.8041,
+          "pr_auc": 0.6661,
+          "positives": 12,
+          "negatives": 37
+        }
+      }
+    }
+  },
+  "close-ups": {
+    "whole": {
+      "overall": {
+        "photos": 92,
+        "macro_f1": 0.6806,
+        "micro_f1": 0.6733,
+        "exact_match": 0.3804,
+        "hamming_loss": 0.1775,
+        "clear_photos": 0,
+        "clear_false_alarm_rate": null,
+        "multi_concern_photos": 49
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.7241,
+          "recall": 0.6774,
+          "f1": 0.7,
+          "roc_auc": 0.808,
+          "pr_auc": 0.796,
+          "positives": 31,
+          "negatives": 61
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.6552,
+          "recall": 0.95,
+          "f1": 0.7755,
+          "roc_auc": 0.9542,
+          "pr_auc": 0.9541,
+          "positives": 20,
+          "negatives": 72
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.7895,
+          "recall": 0.75,
+          "f1": 0.7692,
+          "roc_auc": 0.8806,
+          "pr_auc": 0.8445,
+          "positives": 20,
+          "negatives": 72
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.9375,
+          "recall": 0.5357,
+          "f1": 0.6818,
+          "roc_auc": 0.8153,
+          "pr_auc": 0.7854,
+          "positives": 28,
+          "negatives": 64
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.8235,
+          "recall": 0.4828,
+          "f1": 0.6087,
+          "roc_auc": 0.8725,
+          "pr_auc": 0.7997,
+          "positives": 29,
+          "negatives": 63
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.5152,
+          "recall": 0.5862,
+          "f1": 0.5484,
+          "roc_auc": 0.6738,
+          "pr_auc": 0.6434,
+          "positives": 29,
+          "negatives": 63
+        }
+      }
+    },
+    "region": {
+      "overall": {
+        "photos": 92,
+        "macro_f1": 0.6132,
+        "micro_f1": 0.6074,
+        "exact_match": 0.2826,
+        "hamming_loss": 0.2482,
+        "clear_photos": 0,
+        "clear_false_alarm_rate": null,
+        "multi_concern_photos": 49
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.5208,
+          "recall": 0.8065,
+          "f1": 0.6329,
+          "roc_auc": 0.7507,
+          "pr_auc": 0.599,
+          "positives": 31,
+          "negatives": 61
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.4222,
+          "recall": 0.95,
+          "f1": 0.5846,
+          "roc_auc": 0.9257,
+          "pr_auc": 0.8578,
+          "positives": 20,
+          "negatives": 72
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.64,
+          "recall": 0.8,
+          "f1": 0.7111,
+          "roc_auc": 0.8608,
+          "pr_auc": 0.8517,
+          "positives": 20,
+          "negatives": 72
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.8333,
+          "recall": 0.5357,
+          "f1": 0.6522,
+          "roc_auc": 0.7804,
+          "pr_auc": 0.7602,
+          "positives": 28,
+          "negatives": 64
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.7368,
+          "recall": 0.4828,
+          "f1": 0.5833,
+          "roc_auc": 0.8254,
+          "pr_auc": 0.7572,
+          "positives": 29,
+          "negatives": 63
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.4595,
+          "recall": 0.5862,
+          "f1": 0.5152,
+          "roc_auc": 0.7022,
+          "pr_auc": 0.671,
+          "positives": 29,
+          "negatives": 63
+        }
+      }
+    }
+  },
+  "roboflow": {
+    "whole": {
+      "overall": {
+        "photos": 96,
+        "macro_f1": 0.6363,
+        "micro_f1": 0.7108,
+        "exact_match": 0.25,
+        "hamming_loss": 0.2049,
+        "clear_photos": 0,
+        "clear_false_alarm_rate": null,
+        "multi_concern_photos": 68
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.8056,
+          "recall": 0.9667,
+          "f1": 0.8788,
+          "roc_auc": 0.881,
+          "pr_auc": 0.9179,
+          "positives": 60,
+          "negatives": 36
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.4737,
+          "recall": 0.7826,
+          "f1": 0.5902,
+          "roc_auc": 0.8565,
+          "pr_auc": 0.6875,
+          "positives": 23,
+          "negatives": 73
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.8333,
+          "recall": 0.2273,
+          "f1": 0.3571,
+          "roc_auc": 0.7254,
+          "pr_auc": 0.5999,
+          "positives": 22,
+          "negatives": 74
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 1.0,
+          "recall": 0.4286,
+          "f1": 0.6,
+          "roc_auc": 0.7663,
+          "pr_auc": 0.6724,
+          "positives": 21,
+          "negatives": 75
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.6389,
+          "recall": 0.6389,
+          "f1": 0.6389,
+          "roc_auc": 0.7944,
+          "pr_auc": 0.5952,
+          "positives": 36,
+          "negatives": 60
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.7273,
+          "recall": 0.7805,
+          "f1": 0.7529,
+          "roc_auc": 0.8594,
+          "pr_auc": 0.8535,
+          "positives": 41,
+          "negatives": 55
+        }
+      }
+    },
+    "region": {
+      "overall": {
+        "photos": 96,
+        "macro_f1": 0.6097,
+        "micro_f1": 0.6626,
+        "exact_match": 0.1771,
+        "hamming_loss": 0.2847,
+        "clear_photos": 0,
+        "clear_false_alarm_rate": null,
+        "multi_concern_photos": 68
+      },
+      "per_concern": {
+        "acne": {
+          "threshold": 0.6,
+          "precision": 0.7284,
+          "recall": 0.9833,
+          "f1": 0.8369,
+          "roc_auc": 0.791,
+          "pr_auc": 0.8505,
+          "positives": 60,
+          "negatives": 36
+        },
+        "blackheads": {
+          "threshold": 0.4,
+          "precision": 0.3,
+          "recall": 0.913,
+          "f1": 0.4516,
+          "roc_auc": 0.8309,
+          "pr_auc": 0.6992,
+          "positives": 23,
+          "negatives": 73
+        },
+        "hyperpigmentation": {
+          "threshold": 0.5,
+          "precision": 0.2963,
+          "recall": 0.3636,
+          "f1": 0.3265,
+          "roc_auc": 0.668,
+          "pr_auc": 0.4768,
+          "positives": 22,
+          "negatives": 74
+        },
+        "redness": {
+          "threshold": 0.55,
+          "precision": 0.75,
+          "recall": 0.4286,
+          "f1": 0.5455,
+          "roc_auc": 0.7086,
+          "pr_auc": 0.6403,
+          "positives": 21,
+          "negatives": 75
+        },
+        "enlarged_pores": {
+          "threshold": 0.85,
+          "precision": 0.675,
+          "recall": 0.75,
+          "f1": 0.7105,
+          "roc_auc": 0.812,
+          "pr_auc": 0.6479,
+          "positives": 36,
+          "negatives": 60
+        },
+        "wrinkles": {
+          "threshold": 0.25,
+          "precision": 0.6981,
+          "recall": 0.9024,
+          "f1": 0.7872,
+          "roc_auc": 0.9033,
+          "pr_auc": 0.8806,
+          "positives": 41,
+          "negatives": 55
+        }
+      }
+    }
+  },
+  "faces_found": {
+    "full faces": 48,
+    "close-ups": 29,
+    "roboflow": 71
+  }
+}
