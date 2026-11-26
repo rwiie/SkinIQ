@@ -140,7 +140,7 @@ def test_review_session_starts_from_reference_labels_and_records_reviewer(queue,
     assert s.current()["key"] == "skin_condition:2"
     assert s.initial_labels() == ({"blackheads", "wrinkles"}, True)
     s.submit({"blackheads", "wrinkles"})                  # reviewer agrees
-    assert s.finished and int(s.progress().loc["reviewed", "done"]) == 2
+    assert s.finished and int(s.progress()["done"].sum()) == 2 == int(s.progress()["total"].sum())
 
     # reopening resumes after reviewed photos and shows the reviewer's labels, not the reference
     s2 = ann.ReviewSession(queue, ann.LabelStore(tmp_path / "drive.csv"), reference, annotator="raneem (review)")

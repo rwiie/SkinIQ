@@ -143,8 +143,9 @@ class ReviewSession(AnnotationSession):
         return f" · ticked by {who}" + (" (unsure)" if int(ref["unsure"]) else "")
 
     def progress(self) -> pd.DataFrame:
-        done = self.queue["key"].map(self._reviewed)
-        return pd.DataFrame({"done": [int(done.sum())], "total": [len(done)]}, index=["reviewed"])
+        """Reviewed / total per queue tier (test sample, val sample, train, ...), in queue order."""
+        q = self.queue.assign(done=self.queue["key"].map(self._reviewed))
+        return q.groupby("tier", sort=False)["done"].agg(done="sum", total="size")
 
 
 def review_agreement(reference: pd.DataFrame, reviewed: pd.DataFrame) -> pd.DataFrame:
