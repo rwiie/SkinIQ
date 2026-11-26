@@ -46,8 +46,8 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   then training photos. Minimum: the 500 test + validation photos (≈1 hour). Training labels
   are optional but help, especially clear full faces (the strongest "no concern" examples).
 - **v3 batch:** 216 more full-face training selfies labelled by Claude (`data/labels/review_batch_v3.txt`),
-  raising the fully-labelled training files from 680 (265 photos) to 1,067 (406 photos). Review them in
-  `annotate_colab.ipynb` section 2b (which reviews every Claude-labelled photo), then run `train_multilabel_colab.ipynb`, which saves to
+  raising the fully-labelled training files from 680 (265 photos) to 1,067 (406 photos). All
+  Claude-labelled photos were then relabelled by the author in `annotate_colab.ipynb` section 2b, then run `train_multilabel_colab.ipynb`, which saves to
   `models/skin_concerns_v3/` and compares with v2.
 - **v3 result and decision: the app keeps v2.** On the same 237 test photos v3 tied v2 on macro F1
   (0.661) and mean ROC-AUC (0.850 vs 0.851); it cut clear-skin false alarms (17.2% → 6.9%) and improved

@@ -9,7 +9,15 @@
 
 | 405 (training, full-face selfies from the skin type dataset) | AI vision assistant (Claude) | Same method, nine photos per sheet. 242 have no concerns (clear skin); 110 are flagged unsure and 30 unusable |
 
-| 216 (training, v3 batch: more full-face selfies, `data/labels/review_batch_v3.txt`) | AI vision assistant (Claude), **reviewed by the project author** | Same method, nine photos per sheet. 17 unusable, 58 unsure, 141 usable (84 clear skin). The author checked each photo in a review notebook section (since merged into section 2b, which reviews all 1,099 Claude-labelled photos); reviewed labels replace Claude's in training, and agreement is saved as `review_agreement_all.csv` |
+| 216 (training, v3 batch: more full-face selfies, `data/labels/review_batch_v3.txt`) | AI vision assistant (Claude), **then relabelled by the project author** | Same method, nine photos per sheet. 17 unusable, 58 unsure, 141 usable (84 clear skin) in Claude's labels |
+
+## Relabelling by the project author
+
+The project author relabelled **all 1,099 Claude-labelled photos** (test, validation and training) in
+`annotate_colab.ipynb` section 2b, using the same guidelines. The labelling tool showed Claude's earlier
+labels as a starting point, and the author set every concern for each photo; the author's labels
+(`annotator` = `raneem (review)` in the Drive labels file) replace Claude's everywhere. The difference
+between the two (per concern and split, with Cohen's kappa) is saved as `review_agreement_all.csv`.
 
 Before the v3 batch there were 905 labelled photos; all 1,121 are in `data/labels/multilabel_labels.csv` (`annotator` column: `raneem` or `claude`).
 In test and validation, 106 photos are flagged `unsure` (blurry, small, filtered or heavily made-up) and are left out of the test metrics by default. Unsure training photos are left out of training.
