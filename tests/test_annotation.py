@@ -119,3 +119,35 @@ def test_queue_puts_stratified_test_sample_first(tmp_path):
     assert set(first.dataset) == {"skin_type", "skin_condition"}
     assert (queue[queue.dataset == "skin_type"].prefill.fillna("") == "").all()
     assert set(queue[queue.dataset == "skin_condition"].prefill) == {"acne", "redness"}
+
+
+def test_review_session_starts_from_reference_labels_and_records_reviewer(queue, tmp_path):
+    reference = pd.DataFrame([
+        {"key": "skin_type:1", "dataset": "skin_type", "split": "test", "image": "1.jpg", "md5": "m1",
+         "acne": 0, "blackheads": 0, "hyperpigmentation": 1, "redness": 1, "enlarged_pores": 0, "wrinkles": 0,
+         "unsure": 0, "unusable": 0, "annotator": "claude", "labelled_at": ""},
+        {"key": "skin_condition:2", "dataset": "skin_condition", "split": "test", "image": "2.jpg", "md5": "m2",
+         "acne": 0, "blackheads": 1, "hyperpigmentation": 0, "redness": 0, "enlarged_pores": 0, "wrinkles": 1,
+         "unsure": 1, "unusable": 0, "annotator": "claude", "labelled_at": ""},
+    ])
+    store = ann.LabelStore(tmp_path / "drive.csv")
+    s = ann.ReviewSession(queue, store, reference, annotator="raneem (review)")
+    # only the reference photos are shown, starting with Claude's labels ticked
+    assert s.current()["key"] == "skin_type:1"
+    assert s.initial_labels() == ({"hyperpigmentation", "redness"}, False)
+    assert "claude" in s.note()
+    s.submit({"hyperpigmentation"})                       # reviewer removes redness
+    assert s.current()["key"] == "skin_condition:2"
+    assert s.initial_labels() == ({"blackheads", "wrinkles"}, True)
+    s.submit({"blackheads", "wrinkles"})                  # reviewer agrees
+    assert s.finished and int(s.progress().loc["reviewed", "done"]) == 2
+
+    # reopening resumes after reviewed photos and shows the reviewer's labels, not the reference
+    s2 = ann.ReviewSession(queue, ann.LabelStore(tmp_path / "drive.csv"), reference, annotator="raneem (review)")
+    assert s2.finished
+    s2.back()
+    assert s2.initial_labels() == ({"blackheads", "wrinkles"}, False)
+
+    agree = ann.review_agreement(reference, pd.read_csv(tmp_path / "drive.csv"))
+    assert agree.loc["redness", "changed"] == 1 and agree.loc["redness", "agreement"] == 0.5
+    assert agree.loc["wrinkles", "changed"] == 0 and agree.loc["wrinkles", "agreement"] == 1.0

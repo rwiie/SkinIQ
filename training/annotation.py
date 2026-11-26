@@ -107,6 +107,63 @@ class AnnotationSession:
         return q.groupby("tier", sort=False)["done"].agg(done="sum", total="size")
 
 
+class ReviewSession(AnnotationSession):
+    """Check another annotator's labels (for example Claude's) one photo at a time.
+
+    Each photo opens with the reference labels ticked; the reviewer corrects them if needed and
+    saves. The saved row carries the reviewer's name, so training (where Drive labels win) uses
+    the reviewed labels, and ``review_agreement`` can compare the two annotators.
+    """
+
+    def __init__(self, queue: pd.DataFrame, store: LabelStore, reference: pd.DataFrame,
+                 annotator: str) -> None:
+        self.reference = {r["key"]: r for r in reference.to_dict("records")}
+        super().__init__(queue[queue["key"].isin(self.reference)], store, annotator)
+
+    def _reviewed(self, key: str) -> bool:
+        row = self.store.get(key)
+        return row is not None and str(row.get("annotator", "")) == self.annotator
+
+    def _next_unlabelled(self, start: int) -> int:
+        for i in range(start, len(self.queue)):
+            if not self._reviewed(self.queue.at[i, "key"]):
+                return i
+        return len(self.queue)
+
+    def initial_labels(self) -> tuple[set[str], bool]:
+        key = self.current()["key"]
+        row = self.store.get(key) if self._reviewed(key) else self.reference[key]
+        return {c for c in SKIN_CONDITIONS if int(row[c]) == 1}, bool(int(row["unsure"]))
+
+    def note(self) -> str:
+        ref = self.reference[self.current()["key"]]
+        who = ref.get("annotator", "") or "reference"
+        if int(ref["unusable"]):
+            return f" · <b>{who} marked this unusable</b>"
+        return f" · ticked by {who}" + (" (unsure)" if int(ref["unsure"]) else "")
+
+    def progress(self) -> pd.DataFrame:
+        done = self.queue["key"].map(self._reviewed)
+        return pd.DataFrame({"done": [int(done.sum())], "total": [len(done)]}, index=["reviewed"])
+
+
+def review_agreement(reference: pd.DataFrame, reviewed: pd.DataFrame) -> pd.DataFrame:
+    """Per-concern agreement and Cohen's kappa between two annotators on the same photos
+    (photos either marked unusable are left out)."""
+    from sklearn.metrics import cohen_kappa_score
+
+    both = reference.merge(reviewed, on="key", suffixes=("_ref", "_rev"))
+    both = both[(both["unusable_ref"] == 0) & (both["unusable_rev"] == 0)]
+    rows = []
+    for c in SKIN_CONDITIONS:
+        a, b = both[f"{c}_ref"].astype(int), both[f"{c}_rev"].astype(int)
+        kappa = cohen_kappa_score(a, b) if len(set(a) | set(b)) > 1 else 1.0
+        rows.append({"concern": c, "photos": len(both), "reference_yes": int(a.sum()), "reviewer_yes": int(b.sum()),
+                     "changed": int((a != b).sum()), "agreement": round(float((a == b).mean()), 3) if len(both) else 0.0,
+                     "kappa": round(float(kappa), 3)})
+    return pd.DataFrame(rows).set_index("concern")
+
+
 def image_bytes(path: str | Path, max_side: int = 560) -> bytes:
     img = Image.open(path).convert("RGB")
     img.thumbnail((max_side, max_side))
@@ -147,7 +204,8 @@ def build_ui(session: AnnotationSession, image_root: str | Path):
         unsure.value = was_unsure
         folder = item["folder_labels"].replace("|", ", ")
         info.value = (f"#{item['order']} · {item['tier']} · {item['dataset']} · folder: <i>{folder}</i>"
-                      f"{' · <b>already labelled</b>' if item['key'] in session.store else ''}")
+                      f"{' · <b>already labelled</b>' if item['key'] in session.store else ''}"
+                      f"{session.note() if hasattr(session, 'note') else ''}")
         picture.value = image_bytes(image_root / item["image"])
 
     def on_toggle(change) -> None:

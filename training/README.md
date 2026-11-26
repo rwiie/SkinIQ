@@ -45,6 +45,10 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   test sample (100 each from full faces, close-ups and Roboflow), a 200-photo validation sample,
   then training photos. Minimum: the 500 test + validation photos (≈1 hour). Training labels
   are optional but help, especially clear full faces (the strongest "no concern" examples).
+- **v3 batch:** 216 more full-face training selfies labelled by Claude (`data/labels/review_batch_v3.txt`),
+  raising the fully-labelled training files from 680 (265 photos) to 1,067 (406 photos). Review them in
+  `annotate_colab.ipynb` section 2b, then run `train_multilabel_colab.ipynb`, which saves to
+  `models/skin_concerns_v3/` and compares with v2.
 - **Unlabelled close-ups and Roboflow images still train the model:** their folder concern or
   boxed concerns are known positives; their other concerns are weak negatives (loss weight 0.1).
   Unlabelled full faces are skipped.
