@@ -88,6 +88,8 @@ class AnnotationSession:
         unknown = set(labels) - set(SKIN_CONDITIONS)
         if unknown:
             raise ValueError(f"unknown concerns: {sorted(unknown)}")
+        if self.finished:          # Save clicked after the last photo: nothing to save
+            return
         item = self.current()
         self.store.save({
             "key": item["key"], "dataset": item["dataset"], "split": item["split"],
@@ -193,8 +195,10 @@ def build_ui(session: AnnotationSession, image_root: str | Path):
     def render() -> None:
         done = session.progress()
         progress.value = " · ".join(f"<b>{t}</b> {int(r.done)}/{int(r.total)}" for t, r in done.iterrows())
+        save_btn.disabled = unusable_btn.disabled = session.finished
         if session.finished:
-            info.value = "<h3>All photos labelled 🎉</h3>"
+            info.value = ("<h3>All photos in this list are done 🎉</h3>"
+                          "Nothing left to save here. Use ◀ Back to change one, or go to the next section.")
             picture.value = b""
             return
         item = session.current()

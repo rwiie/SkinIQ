@@ -151,3 +151,26 @@ def test_review_session_starts_from_reference_labels_and_records_reviewer(queue,
     agree = ann.review_agreement(reference, pd.read_csv(tmp_path / "drive.csv"))
     assert agree.loc["redness", "changed"] == 1 and agree.loc["redness", "agreement"] == 0.5
     assert agree.loc["wrinkles", "changed"] == 0 and agree.loc["wrinkles", "agreement"] == 1.0
+
+
+def test_save_after_the_last_photo_does_nothing(queue, tmp_path):
+    store = ann.LabelStore(tmp_path / "labels.csv")
+    s = ann.AnnotationSession(queue, store, annotator="raneem")
+    for _ in range(len(queue)):
+        s.submit(set())
+    assert s.finished
+    s.submit({"acne"})                                     # an extra click on Save must not crash
+    s.submit(set(), unusable=True)
+    assert s.finished and len(pd.read_csv(tmp_path / "labels.csv")) == len(queue)
+
+
+def test_widget_disables_save_when_the_list_is_done(queue, tmp_path):
+    pytest.importorskip("ipywidgets")
+    s = ann.AnnotationSession(queue, ann.LabelStore(tmp_path / "labels.csv"), annotator="raneem")
+    ui = ann.build_ui(s, tmp_path / "img")
+    for _ in range(len(queue)):
+        ui.save.click()
+    assert s.finished and ui.save.disabled and ui.unusable.disabled and "done" in ui.info.value
+    ui.save.click()                                         # still no crash
+    ui.back.click()
+    assert not ui.save.disabled and "already labelled" in ui.info.value
