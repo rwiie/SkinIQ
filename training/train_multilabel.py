@@ -317,9 +317,15 @@ def main(argv=None) -> dict:
     # Best checkpoint: tune per-concern thresholds on validation, evaluate on test
     ckpt = torch.load(out / "model.pt", map_location=device, weights_only=False)
     model.load_state_dict(ckpt["state_dict"])
+    val_summary = {}
     if select_by_auc:
         p_val, y_val = photo_level(val_t, predict_probs(model, val_dl, device)[0])
         thresholds = tune_thresholds(p_val, y_val)
+        aucs = [roc_auc_score(y_val[:, j], p_val[:, j]) for j in range(len(C)) if 0 < y_val[:, j].sum() < len(y_val)]
+        # For choosing between runs (experiments): thresholds are tuned on these same photos, so the val
+        # macro F1 is optimistic; the threshold-free val mean ROC-AUC is the fairer selection score.
+        val_summary = {"photos": int(len(y_val)), "mean_roc_auc": round(float(np.mean(aucs)), 4) if aucs else None,
+                       "macro_f1_tuned": overall_metrics(p_val, y_val, thresholds)["macro_f1"]}
     else:
         thresholds = {c: 0.5 for c in C}
     ckpt["thresholds"] = thresholds
@@ -334,7 +340,7 @@ def main(argv=None) -> dict:
         "run_name": args.run_name, "model": args.model, "best_epoch": best_epoch, "epochs_run": len(history),
         "selected_by": "val mean ROC-AUC" if select_by_auc else "val loss (too few annotated val photos)",
         "train_files": int(len(train_t)), "train_files_fully_annotated": int(train_t.annotated.sum()),
-        "test": overall, "per_concern": per.to_dict(orient="index"), "thresholds": thresholds,
+        "val": val_summary, "test": overall, "per_concern": per.to_dict(orient="index"), "thresholds": thresholds,
         "settings": {k: str(v) for k, v in vars(args).items()},
     }
     (out / "metrics.json").write_text(json.dumps(metrics, indent=2))

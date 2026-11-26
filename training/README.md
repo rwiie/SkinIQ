@@ -67,6 +67,14 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   F1, ROC-AUC and PR-AUC; overall macro/micro F1, exact match, Hamming loss, and the
   false-alarm rate on clear-skin photos.
 
+## Training experiments (`experiments_colab.ipynb`)
+
+Three one-factor experiments around the v2 settings, all on the author's relabelled labels:
+data augmentation (mild / **strong**), learning rate (1e-4 / **2e-4** / 3e-4) and dropout
+(0.2 / **0.3** / 0.4). The baseline (bold values) is the v4 run; 5 new runs. The best value of each
+setting is chosen by validation mean ROC-AUC; test results are reported for every run
+(`models/experiments/experiment_results.csv`).
+
 ## Run locally (GPU)
 
 ```bash
