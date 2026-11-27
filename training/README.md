@@ -74,6 +74,22 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   Ranking ability is the same (ROC-AUC 0.79); v4's higher F1 comes almost all from hyperpigmentation
   (F1 0.43 → 0.67), which the author marks far more often (139 of 248 test photos). Results:
   `results/v2_on_author_labels/`.
+- **v2_author: v2's exact photos and settings, the author's labels** (`experiments_colab.ipynb` section 5,
+  `data/labels/v2_photos_author_labels.csv`). Only the labels change. On v2's 237 test photos, scored with the
+  author's labels and thresholds tuned on the same 198 validation photos:
+
+  | | v2 (Claude's labels) | v2_author (author's labels) |
+  |---|---:|---:|
+  | Macro F1 | 0.594 | **0.625** |
+  | Mean ROC-AUC | 0.788 | 0.792 |
+  | Macro precision / recall | 0.690 / 0.579 | **0.705 / 0.592** |
+  | Exact match | 16.9% | **20.7%** |
+  | Hamming loss | 0.266 | **0.244** |
+  | Clear-skin false alarms (16 photos) | **31%** | 56% |
+
+  Training on the author's labels raises macro F1 by 0.03, almost all from hyperpigmentation (F1 0.42 → 0.64);
+  ranking ability (ROC-AUC) is unchanged. Results: `results/skin_concerns_v2_author/`,
+  `results/v2_photos_author_labels/` (v2's scores).
 - **Unlabelled close-ups and Roboflow images still train the model:** their folder concern or
   boxed concerns are known positives; their other concerns are weak negatives (loss weight 0.1).
   Unlabelled full faces are skipped.

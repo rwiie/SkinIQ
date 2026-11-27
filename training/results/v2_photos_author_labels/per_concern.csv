@@ -1,0 +1,19 @@
+model,setup,thresholds,concern,threshold,precision,recall,f1,roc_auc,pr_auc,positives,negatives
+v2,single image,stored in checkpoint,acne,0.55,0.7071,0.6796,0.6931,0.8305,0.8249,103,134
+v2,single image,stored in checkpoint,blackheads,0.15,0.4177,0.8919,0.569,0.9065,0.7584,37,200
+v2,single image,stored in checkpoint,hyperpigmentation,0.35,0.8125,0.1955,0.3152,0.6689,0.731,133,104
+v2,single image,stored in checkpoint,redness,0.5,0.963,0.4127,0.5778,0.7767,0.7029,63,174
+v2,single image,stored in checkpoint,enlarged_pores,0.55,0.5821,0.6842,0.629,0.8674,0.7126,57,180
+v2,single image,stored in checkpoint,wrinkles,0.25,0.6711,0.4322,0.5258,0.6778,0.7228,118,119
+v2,single image,retuned on these val labels,acne,0.45,0.7019,0.7087,0.7053,0.8305,0.8249,103,134
+v2,single image,retuned on these val labels,blackheads,0.45,0.5283,0.7568,0.6222,0.9065,0.7584,37,200
+v2,single image,retuned on these val labels,hyperpigmentation,0.05,0.76,0.2857,0.4153,0.6689,0.731,133,104
+v2,single image,retuned on these val labels,redness,0.5,0.963,0.4127,0.5778,0.7767,0.7029,63,174
+v2,single image,retuned on these val labels,enlarged_pores,0.55,0.5821,0.6842,0.629,0.8674,0.7126,57,180
+v2,single image,retuned on these val labels,wrinkles,0.05,0.6066,0.6271,0.6167,0.6778,0.7228,118,119
+v2,mirror averaging,retuned on these val labels,acne,0.45,0.7212,0.7282,0.7246,0.8397,0.8324,103,134
+v2,mirror averaging,retuned on these val labels,blackheads,0.4,0.5185,0.7568,0.6154,0.9105,0.7621,37,200
+v2,mirror averaging,retuned on these val labels,hyperpigmentation,0.05,0.6981,0.2782,0.3978,0.6614,0.7216,133,104
+v2,mirror averaging,retuned on these val labels,redness,0.55,0.963,0.4127,0.5778,0.7796,0.7032,63,174
+v2,mirror averaging,retuned on these val labels,enlarged_pores,0.5,0.5652,0.6842,0.619,0.8624,0.6971,57,180
+v2,mirror averaging,retuned on these val labels,wrinkles,0.05,0.6111,0.6525,0.6311,0.682,0.7249,118,119
