@@ -1,0 +1,9 @@
+experiment,run,augmentation,learning rate,dropout,best epoch,val mean ROC-AUC,test macro F1,test micro F1,test macro precision,test macro recall,test mean ROC-AUC,exact match,hamming loss,clear-skin false alarms,F1 acne,F1 blackheads,F1 hyperpigmentation,F1 redness,F1 enlarged_pores,F1 wrinkles,selected
+1. Data augmentation,baseline,strong,0.0002,0.3,6,0.7755,0.6273,0.6486,0.6016,0.6894,0.7896,0.1613,0.2695,0.4667,0.7429,0.5424,0.669,0.5664,0.5812,0.6621,✓
+1. Data augmentation,exp1_aug_mild,mild,0.0002,0.3,8,0.7715,0.6008,0.6071,0.6627,0.6028,0.783,0.1935,0.2661,0.5333,0.7308,0.566,0.5073,0.5859,0.6,0.6148,
+2. Learning rate,exp2_lr_1e-4,strong,0.0001,0.3,8,0.7736,0.6288,0.6561,0.6188,0.6836,0.7896,0.1734,0.2628,0.8,0.7122,0.531,0.6959,0.549,0.6,0.6844,
+2. Learning rate,baseline,strong,0.0002,0.3,6,0.7755,0.6273,0.6486,0.6016,0.6894,0.7896,0.1613,0.2695,0.4667,0.7429,0.5424,0.669,0.5664,0.5812,0.6621,✓
+2. Learning rate,exp2_lr_3e-4,strong,0.0003,0.3,4,0.7732,0.6289,0.6562,0.6199,0.678,0.7718,0.1613,0.2648,0.6667,0.6995,0.6,0.7104,0.5882,0.5085,0.6667,
+3. Dropout rate,exp3_dropout_0.2,strong,0.0002,0.2,4,0.7703,0.6259,0.6564,0.6273,0.6479,0.7716,0.1935,0.2554,0.6,0.7069,0.5287,0.695,0.5825,0.5614,0.6806,
+3. Dropout rate,baseline,strong,0.0002,0.3,6,0.7755,0.6273,0.6486,0.6016,0.6894,0.7896,0.1613,0.2695,0.4667,0.7429,0.5424,0.669,0.5664,0.5812,0.6621,✓
+3. Dropout rate,exp3_dropout_0.4,strong,0.0002,0.4,6,0.7714,0.6297,0.6542,0.6368,0.6662,0.7868,0.1734,0.2608,0.6,0.7522,0.5833,0.637,0.5625,0.5565,0.6869,
