@@ -16,7 +16,7 @@ visibility checks now use trained models:
 | YuNet (OpenCV Zoo) | Face box and 5 landmarks; framing and pose | MIT | 0.2 MB |
 | Face parsing, BiSeNet ResNet-18 (yakhyo/face-parsing via `jbrownkramer/face-parsing`) | Labels each pixel: skin, eyebrows, eyes, **glasses**, nose, lips, **hair**, **hat**… | MIT code; trained on CelebAMask-HQ (**non-commercial research and education only**) | 53 MB |
 | MediaPipe palm detector + hand landmark model (OpenCV Zoo ONNX) | Hands touching or covering the face (face parsing labels hands as skin) | Apache-2.0 | 4 + 4 MB |
-| CLIP ViT-B/32 image encoder (OpenAI; quantized ONNX by Xenova) + two small classifiers trained for SkinIQ (`skiniq/vision/assets/clip_probes.json`) | Drawing / cartoon vs real photo; hand on face (extra evidence) | MIT | 89 MB |
+| CLIP ViT-B/32 image encoder (OpenAI; quantized ONNX by Xenova) + one small classifier trained for SkinIQ (`skiniq/vision/assets/clip_probes.json`) | Drawing / cartoon vs real photo | MIT | 89 MB |
 
 Models are downloaded on first use into `models/photo_check/` and checked against their SHA-256
 (`skiniq/vision/face_models.py`). The camera runs YuNet, face parsing and the palm detector in the browser with
@@ -32,7 +32,7 @@ If the models cannot be downloaded, the server falls back to the earlier rule-ba
 | Face mask over nose or mouth | Nose or lip pixels missing where the landmarks put them | nose < 10% or lips < 5% of their areas |
 | Sheet / clay mask, colour filter | Median redness (a\*) of the skin: every real skin tone is reddish; white sheet masks, green clay and blue/grey filters are not | a\* < 3 |
 | Forehead covered | Hair or hat pixels in the band just above the eyebrows (pure-black areas and areas outside the photo ignored) | > 55% |
-| Hand on face | Palm detector on the photo and on a close-up of the face, each palm overlapping the face confirmed by the hand landmark model; plus the CLIP hand classifier | palm ≥ 0.8 or landmarks ≥ 0.5, or CLIP ≥ 0.7 |
+| Hand on face | Pre-trained MediaPipe models only (no training): palm detector on the photo and on a close-up of the face, each palm overlapping the face confirmed by the hand landmark model | palm ≥ 0.8 or landmarks ≥ 0.5 |
 | Drawing / cartoon | CLIP classifier | ≥ 0.5 |
 | Black-and-white photo | 90th percentile HSV saturation of the photo | < 25 |
 | Too dark | The brightest 5% of the photo (L\*) is dim (in a well-lit photo something is bright whatever the skin tone), or > 20% of skin pixels crushed to black | < 65 |
@@ -50,7 +50,7 @@ huggan/selfie2anime. Photos were placed head and shoulders on a larger canvas, a
 
 | Test | Result |
 |---|---|
-| 177 labelled selfies, 104 with a hand on the face (`training/results/photo_check/hand_labels.csv`) | 87% of hand photos rejected for the hand, 4% of the others wrongly |
+| 177 labelled selfies, 104 with a hand on the face (`training/results/photo_check/hand_labels.csv`; 170 with a detected face) | Palm detector + hand landmarks: **90.2%** of hand photos caught, **10.3%** of the others wrongly flagged. A CLIP hand classifier trained on these photos was tested as extra evidence: under cross-validation it caught no extra hands and raised false alarms to 13.2%, so it was removed |
 | Drawings, each style held out of training | 72–100% caught at 0.5; real photos flagged 0.0–0.1%; YuNet finds no face in a further ~30% of drawings |
 | Real problem photos (hands, glasses, sunglasses, closed eyes, fringe, cap) | All rejected with the right reason, on the server and live in the camera |
 | Darkness | 4.2% of normal photos flagged (the dimmest, reviewed: dim lighting, no well-lit darker skin among them); 64% of the same photos at 45% exposure caught |

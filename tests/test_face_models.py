@@ -61,7 +61,7 @@ def test_highlights_measure_exposure():
 
 
 def test_clip_classifiers_are_well_formed():
-    for probe in ("drawing", "hand"):
+    for probe in ("drawing",):
         p = fm._probes()[probe]
         assert len(p["weights"]) == 512 and 0 < p["threshold"] < 1 and p["trained_on"] and p["validation"]
         e = np.random.default_rng(1).normal(size=512).astype(np.float32)

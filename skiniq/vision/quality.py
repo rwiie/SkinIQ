@@ -287,9 +287,8 @@ def model_problems(rgb: np.ndarray, face: np.ndarray, measures: dict[str, float]
     codes = ["greyscale"] if grey else []
     codes += fm.parts_problems(parts, colour_photo=not grey)
     hand, palm, conf = fm.hand_on_face(rgb, face)
-    clip_hand = fm.clip_probability(embedding, "hand")
-    measures.update(hand_palm=palm, hand_landmarks=conf, hand_clip=clip_hand)
-    if hand or clip_hand >= fm.clip_threshold("hand"):
+    measures.update(hand_palm=palm, hand_landmarks=conf)
+    if hand:                                      # pre-trained MediaPipe palm + hand-landmark models only
         codes.append("hand")
     measures["highlights"] = fm.highlights(rgb)
     li = LIGHTING
