@@ -59,6 +59,21 @@ whose bounding boxes are converted to six image-level labels by `prepare_roboflo
   acne (F1 0.77 → 0.82), but lowered hyperpigmentation (0.58 → 0.54) and enlarged pores (0.70 → 0.64).
   With no gain in overall detection, v2 stays in the app; v3 is reported as an experiment
   (`results/skin_concerns_v3/`).
+- **v2 vs v4 on the same answer key.** v2 was trained and first scored on Claude's labels; v4 on the
+  author's relabelled labels. `evaluate_multilabel.py` scored v2 against the author's labels (same 248
+  test photos as v4, thresholds re-tuned on the author's validation photos):
+
+  | | v2 | v4 |
+  |---|---:|---:|
+  | Macro F1 | 0.592 (0.593 with mirror averaging) | **0.627** |
+  | Mean ROC-AUC | 0.786 | 0.790 |
+  | Macro precision / recall | **0.685** / 0.573 | 0.602 / **0.689** |
+  | Exact match | 16.9% | 16.1% |
+  | Clear-skin false alarms (15 photos) | **33%** | 47% |
+
+  Ranking ability is the same (ROC-AUC 0.79); v4's higher F1 comes almost all from hyperpigmentation
+  (F1 0.43 → 0.67), which the author marks far more often (139 of 248 test photos). Results:
+  `results/v2_on_author_labels/`.
 - **Unlabelled close-ups and Roboflow images still train the model:** their folder concern or
   boxed concerns are known positives; their other concerns are weak negatives (loss weight 0.1).
   Unlabelled full faces are skipped.
