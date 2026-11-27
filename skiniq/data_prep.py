@@ -193,3 +193,54 @@ def prepare(
     result = remove_duplicates(records, single_label=single_label)
     assign_splits(result.kept, ratios, seed=seed)
     return result
+
+
+# ---- one image per photo (no augmented copies, no duplicates) ----------------------------------
+
+def border_darkness(gray) -> float:
+    """Share of near-black pixels in the outer 5% frame of a greyscale array (0-255).
+
+    Rotated or shifted augmented copies are padded with black, so the copy with the least
+    dark border is the one closest to the original photo.
+    """
+    import numpy as np
+
+    a = np.asarray(gray, dtype=float)
+    h, w = a.shape[:2]
+    bh, bw = max(1, h // 20), max(1, w // 20)
+    frame = np.concatenate([a[:bh].ravel(), a[-bh:].ravel(), a[:, :bw].ravel(), a[:, -bw:].ravel()])
+    return float((frame < 12).mean())
+
+
+def photo_clusters(groups: list, embeddings, same_photo: float, duplicate: float) -> list[int]:
+    """Cluster image files into photos.
+
+    ``groups[i]`` is the name-based group of file i (files sharing an original-photo name) and
+    ``embeddings[i]`` its unit-length image embedding. Within a name group, files are only kept
+    together when they look alike (cosine >= ``same_photo``): generic names such as "3.jpg" can
+    link unrelated photos. Across groups, files that are near-identical (cosine >= ``duplicate``)
+    are merged: the same photo saved under two names or in two datasets.
+    Returns a cluster id per file.
+    """
+    import numpy as np
+
+    e = np.asarray(embeddings, dtype=np.float32)
+    uf = _UnionFind(len(groups))
+    members: dict = defaultdict(list)
+    for i, g in enumerate(groups):
+        members[g].append(i)
+    for idx in members.values():
+        if len(idx) > 1:
+            sim = e[idx] @ e[idx].T
+            for a in range(len(idx)):
+                for b in range(a + 1, len(idx)):
+                    if sim[a, b] >= same_photo:
+                        uf.union(idx[a], idx[b])
+    for start in range(0, len(e), 2048):
+        sim = e[start:start + 2048] @ e.T
+        for a, b in zip(*np.nonzero(sim >= duplicate)):
+            i = start + int(a)
+            if i < b:
+                uf.union(i, int(b))
+    roots: dict[int, int] = {}
+    return [roots.setdefault(uf.find(i), len(roots)) for i in range(len(groups))]

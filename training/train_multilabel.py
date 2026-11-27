@@ -60,7 +60,10 @@ def build_table(processed: Path, labels_csv: Path | None, unknown_negative_weigh
     rows = []
     for dataset in ("skin_type", "skin_condition"):
         manifest = pd.read_csv(processed / dataset / "manifest.csv")
-        folder_labels = manifest.groupby("group")["label"].agg(set)
+        if "labels" in manifest:  # one image per photo (make_unique.py): all its folders in one row
+            folder_labels = manifest.groupby("group")["labels"].agg(lambda s: set("|".join(s).split("|")))
+        else:
+            folder_labels = manifest.groupby("group")["label"].agg(set)
         for r in manifest.itertuples():
             key = f"{dataset}:{r.group}"
             row = {"path": str(processed / r.path), "split": r.split, "key": key, "dataset": dataset,
