@@ -16,6 +16,7 @@ data/processed/*
 !data/raw/.gitkeep
 !data/raw/products.csv
 !data/processed/.gitkeep
+data/processed_unique/
 models/*
 app/static/photo_check/
 !models/.gitkeep

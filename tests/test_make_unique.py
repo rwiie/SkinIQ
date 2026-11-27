@@ -48,57 +48,59 @@ def test_similar_but_different_photos_with_different_names_stay_apart():
     assert c[0] != c[1]
 
 
-def write_task(root, task, rows):
-    out = []
-    for path, label, split, group, source, pad in rows:
-        p = root / task / split / label / path
-        p.parent.mkdir(parents=True, exist_ok=True)
-        a = np.full((60, 60, 3), 160, np.uint8)
-        if pad:
-            a[:, :10] = 0
-        Image.fromarray(a).save(p)
-        out.append({"path": f"{task}/{split}/{label}/{path}", "label": label, "split": split, "group": group,
-                    "source": source, "width": 60, "height": 60, "low_res": 1, "original": "", "md5": path})
-    pd.DataFrame(out).to_csv(root / task / "manifest.csv", index=False)
+def make_photo(root, path):
+    p = root / path
+    p.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(np.full((40, 40, 3), 160, np.uint8)).save(p)
 
 
 def test_one_image_per_photo_end_to_end(tmp_path):
     data = tmp_path / "processed"
-    write_task(data, "skin_type", [
-        ("a1.jpg", "oily", "test", 0, "a", True),    # labelled copy: must be kept even though padded
-        ("a2.jpg", "oily", "test", 0, "a", False),
-        ("b1.jpg", "dry", "train", 1, "b", False),
+    paths = ["skin_type/test/oily/a1.jpg", "skin_type/test/oily/a2.jpg", "skin_condition/train/acne/c1.jpg",
+             "skin_condition/train/redness/c2.jpg", "skin_condition/val/wrinkles/x1.jpg"]
+    for p in paths:
+        make_photo(data, p)
+    photos = pd.DataFrame([
+        # photo 0: skin type face (a1 kept, a2 its copy)
+        {"photo_id": 0, "key": "skin_type:0", "dataset": "skin_type", "group": 0, "image": paths[0], "md5": "a",
+         "label": "oily", "folder_labels": None, "split": "test", "full_face": 1, "images": 2},
+        # photo 1: close-up filed under acne and redness
+        {"photo_id": 1, "key": "skin_condition:0", "dataset": "skin_condition", "group": 0, "image": paths[2],
+         "md5": "c", "label": "acne", "folder_labels": "acne|redness", "split": "train", "full_face": 0,
+         "images": 2},
+        # photo 2: a different picture that shares the name group 0
+        {"photo_id": 2, "key": "skin_condition:0", "dataset": "skin_condition", "group": 0, "image": paths[4],
+         "md5": "x", "label": "wrinkles", "folder_labels": "wrinkles", "split": "val", "full_face": 1,
+         "images": 1},
     ])
-    write_task(data, "skin_condition", [
-        ("c1.jpg", "acne", "train", 0, "c", True),   # augmented copy with black padding
-        ("c2.jpg", "acne", "train", 0, "c", False),
-        ("c3.jpg", "redness", "train", 0, "c", False),  # same photo in a second concern folder
-        ("d1.jpg", "redness", "train", 1, "d", False),  # same photo as skin_type b1 (reused dataset)
-        ("x1.jpg", "wrinkles", "val", 0, "c", False),   # unrelated photo sharing the name "c"
-    ])
-    # embeddings in manifest order: skin_type a1 a2 b1, then skin_condition c1 c2 c3 d1 x1
-    e = np.stack([unit(1, 0, 0, 0), unit(1, 0.05, 0, 0), unit(0, 1, 0, 0),
-                  unit(0, 0, 1, 0), unit(0, 0, 1, 0.05), unit(0, 0.05, 1, 0), unit(0, 1, 0.01, 0),
-                  unit(0, 0, 0, 1)])
-    np.save(tmp_path / "e.npy", e)
-    pd.DataFrame([{"key": "skin_type:0", "image": "skin_type/test/oily/a1.jpg"}]).to_csv(tmp_path / "lab.csv",
-                                                                                     index=False)
-    out = tmp_path / "unique"
-    mu.main(["--data-dir", str(data), "--out", str(out), "--labels", str(tmp_path / "lab.csv"),
-             "--embeddings", str(tmp_path / "e.npy"), "--report", str(tmp_path / "r.md")])
+    files = pd.DataFrame({"path": paths, "photo_id": [0, 0, 1, 1, 2]})
+    photos.to_csv(tmp_path / "photos.csv", index=False)
+    files.to_csv(tmp_path / "files.csv", index=False)
+    c = ["acne", "blackheads", "hyperpigmentation", "redness", "enlarged_pores", "wrinkles"]
+    row = lambda key, image, ann, pos: {"key": key, "dataset": key.split(":")[0], "split": "x", "image": image,
+                                         **{k: int(k in pos) for k in c}, "unsure": 0, "unusable": 0,
+                                         "annotator": ann}
+    pd.DataFrame([row("skin_type:0", paths[1], "author", ["wrinkles"]),          # labelled on a copy
+                  row("skin_condition:0", paths[4], "author", ["wrinkles"])]).to_csv(tmp_path / "a.csv",
+                                                                                      index=False)
+    pd.DataFrame([row("skin_type:0", paths[0], "second", ["acne"])]).to_csv(tmp_path / "b.csv", index=False)
 
+    out = tmp_path / "unique"
+    photos_out, labels = mu.main(["--data-dir", str(data), "--out", str(out), "--photos", str(tmp_path / "photos.csv"),
+                                  "--files", str(tmp_path / "files.csv"), "--labels", str(tmp_path / "a.csv"),
+                                  str(tmp_path / "b.csv"), "--labels-out", str(tmp_path / "labels.csv")])
+
+    sc = pd.read_csv(out / "skin_condition" / "manifest.csv").set_index("photo_id")
+    assert sc.loc[2, "group"] == 0                        # labelled photo keeps the name group's id
+    assert sc.loc[1, "group"] >= mu.NEW_GROUP_OFFSET      # the other picture gets a new id
+    assert sc.loc[1, "labels"] == "acne|redness"
+    assert (out / "skin_condition" / "train" / "acne" / "c1.jpg").exists()
     st = pd.read_csv(out / "skin_type" / "manifest.csv")
-    sc = pd.read_csv(out / "skin_condition" / "manifest.csv")
-    assert list(st.path.map(lambda p: Path(p).name)) == ["a1.jpg"]  # labelled copy kept; b1 is d1's twin
-    assert sorted(Path(p).name for p in sc.path) == ["c2.jpg", "d1.jpg", "x1.jpg"]  # unpadded copy kept
-    c = sc.set_index(sc.path.map(lambda p: Path(p).name))
-    assert set(c.loc["c2.jpg", "labels"].split("|")) == {"acne", "redness"}
-    assert c.loc["x1.jpg", "group"] >= mu.NEW_GROUP_OFFSET   # split off the "c" name group
-    assert c.loc["c2.jpg", "group"] == 0
-    assert (out / "skin_condition" / "train" / "acne" / "c2.jpg").exists()
-    assert set(pd.read_csv(out / "skin_condition" / "removed.csv").reason) == {"augmented copy"}
-    assert set(pd.read_csv(out / "skin_type" / "removed.csv").reason) == {
-        "augmented copy", "duplicate of skin_condition/train/redness/d1.jpg"}
+    assert list(st.path) == ["skin_type/test/oily/a1.jpg"]   # one image per photo
+    lab = labels.set_index("key")
+    assert lab.loc["skin_type:0", "annotator"] == "second"   # later file wins for the same photo
+    assert lab.loc["skin_type:0", "split"] == "test"         # the photo's split, not the label file's
+    assert lab.loc["skin_condition:0", "image"] == paths[4]  # label followed the picture it was made on
 
 
 def test_training_reads_all_concern_folders_of_a_photo(tmp_path):
